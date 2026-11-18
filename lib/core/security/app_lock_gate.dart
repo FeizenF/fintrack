@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/app_database.dart';
+import '../services/attachment_cleanup_service.dart';
 import '../theme/app_colors.dart';
 import '../../shared/providers/app_lock_provider.dart';
+import '../../shared/providers/attachment_cleanup_providers.dart';
 import '../../shared/providers/database_providers.dart';
 import '../../shared/providers/security_providers.dart';
 import 'pin_hasher.dart';
@@ -162,19 +164,42 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
         ) ??
         false;
     if (!confirmed || !mounted) return;
+    String? cleanupWarning;
     try {
       final AppDatabase database = await ref.read(appDatabaseProvider.future);
+      final List<String?> attachmentPaths =
+          await (database.select(database.transactions)
+                ..where((t) => t.attachmentPath.isNotNull()))
+              .map(
+                (FinancialTransaction transaction) =>
+                    transaction.attachmentPath,
+              )
+              .get();
+      await ref.read(securityRepositoryProvider).removePin();
       await database.transaction(() async {
-        await database.customStatement('DELETE FROM savings_contributions');
-        await database.customStatement('DELETE FROM budgets');
-        await database.customStatement('DELETE FROM transactions');
-        await database.customStatement('DELETE FROM savings_goals');
-        await database.customStatement('DELETE FROM categories');
-        await database.customStatement('DELETE FROM accounts');
-        await database.customStatement('DELETE FROM app_settings');
+        await database.delete(database.savingsContributions).go();
+        await database.delete(database.budgets).go();
+        await database.delete(database.transactions).go();
+        await database.delete(database.savingsGoals).go();
+        await database.delete(database.categories).go();
+        await database.delete(database.accounts).go();
+        await database.delete(database.appSettings).go();
         await database.ensureSeeded();
       });
-      await ref.read(securityRepositoryProvider).removePin();
+      try {
+        final AttachmentCleanupResult result = await ref
+            .read(attachmentCleanupServiceProvider)
+            .deleteOwnedAttachments(attachmentPaths);
+        if (result.hasIncompleteCleanup) {
+          cleanupWarning =
+              'Reset selesai. Sebagian lampiran tidak dapat dihapus '
+              '(${result.retainedCount + result.failedPaths.length} file).';
+        }
+      } on Object {
+        cleanupWarning =
+            'Reset selesai, tetapi penghapusan lampiran gagal. Hapus file '
+            'lampiran secara manual dari penyimpanan aplikasi jika perlu.';
+      }
     } on Object {
       if (mounted) {
         ref.invalidate(pinRecordExistsProvider);
@@ -184,6 +209,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     }
     if (!mounted) return;
     ref.read(appLockControllerProvider.notifier).reset();
+    if (cleanupWarning != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(cleanupWarning)),
+      );
+    }
   }
 
   @override
