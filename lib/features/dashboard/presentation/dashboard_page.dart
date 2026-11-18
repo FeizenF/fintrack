@@ -65,7 +65,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ref.invalidate(recentTransactionsProvider);
           },
           child: ListView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xxl * 3),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxl * 4),
             physics: const AlwaysScrollableScrollPhysics(),
             children: <Widget>[
               TabPageHeader(
@@ -178,6 +178,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     setState(() => _savingPreference = true);
     try {
       await setHideBalances(ref, !hidden);
+    } on Object {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Preferensi saldo gagal disimpan.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _savingPreference = false);
     }

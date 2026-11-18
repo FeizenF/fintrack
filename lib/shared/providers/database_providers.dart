@@ -321,3 +321,24 @@ Future<void> setHideBalances(WidgetRef ref, bool value) async {
   final AppDatabase database = await ref.read(appDatabaseProvider.future);
   await database.saveSetting(SettingKeys.hideBalances, value ? '1' : '0');
 }
+
+/// Timestamp of the last successful backup, or `null` when never backed up.
+final StreamProvider<DateTime?> lastBackupAtProvider =
+    StreamProvider<DateTime?>((Ref ref) async* {
+      final AppDatabase database = await ref.watch(appDatabaseProvider.future);
+      yield* database
+          .customSelect(
+            'SELECT value FROM app_settings WHERE key = ?',
+            variables: <Variable<Object>>[
+              Variable<String>(SettingKeys.lastBackupAt),
+            ],
+            readsFrom: <TableInfo<Table, Object?>>{database.appSettings},
+          )
+          .watch()
+          .map(
+            (List<QueryRow> rows) => rows.isEmpty
+                ? null
+                : DateTime.tryParse(rows.single.read<String>('value'))
+                      ?.toLocal(),
+          );
+    });

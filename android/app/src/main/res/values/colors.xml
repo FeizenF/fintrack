@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand surfaces used by the launch screen and adaptive launcher icon. -->
+    <color name="splash_background">#14213D</color>
+    <color name="ic_launcher_background">#14213D</color>
+</resources>

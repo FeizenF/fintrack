@@ -22,6 +22,7 @@ class TransactionsPage extends ConsumerStatefulWidget {
 
 class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   TransactionType? _filter;
+  int? _accountFilter;
   final TextEditingController _search = TextEditingController();
   String _query = '';
 
@@ -37,9 +38,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       filteredTransactionsProvider(_filter),
     );
     final AsyncValue<List<Account>> accounts = ref.watch(accountsProvider);
-    final Map<int, String> names = <int, String>{
+    final AsyncValue<List<Category>> categories = ref.watch(categoriesProvider);
+    final Map<int, String> accountNames = <int, String>{
       for (final Account account in accounts.value ?? const <Account>[])
         account.id: account.name,
+    };
+    final Map<int, String> categoryNames = <int, String>{
+      for (final Category category in categories.value ?? const <Category>[])
+        category.id: category.name,
     };
 
     return Scaffold(
@@ -62,7 +68,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               onChanged: (String value) =>
                   setState(() => _query = value.trim().toLowerCase()),
               decoration: InputDecoration(
-                hintText: 'Cari catatan atau kategori',
+                hintText: 'Cari catatan, kategori, atau akun',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _query.isEmpty
                     ? null
@@ -80,25 +86,38 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Row(
+          _ChipRow(
+            children: <Widget>[
+              _FilterChip(
+                label: 'Semua',
+                selected: _filter == null,
+                onTap: () => setState(() => _filter = null),
+              ),
+              for (final TransactionType type in TransactionType.values)
+                _FilterChip(
+                  label: type.label,
+                  selected: _filter == type,
+                  onTap: () => setState(() => _filter = type),
+                ),
+            ],
+          ),
+          if ((accounts.value?.length ?? 0) > 1)
+            _ChipRow(
               children: <Widget>[
                 _FilterChip(
-                  label: 'Semua',
-                  selected: _filter == null,
-                  onTap: () => setState(() => _filter = null),
+                  label: 'Semua akun',
+                  selected: _accountFilter == null,
+                  onTap: () => setState(() => _accountFilter = null),
                 ),
-                for (final TransactionType type in TransactionType.values)
+                for (final Account account
+                    in accounts.value ?? const <Account>[])
                   _FilterChip(
-                    label: type.label,
-                    selected: _filter == type,
-                    onTap: () => setState(() => _filter = type),
+                    label: account.name,
+                    selected: _accountFilter == account.id,
+                    onTap: () => setState(() => _accountFilter = account.id),
                   ),
               ],
             ),
-          ),
           const SizedBox(height: AppSpacing.sm),
           Expanded(
             child: value.when(
@@ -110,21 +129,36 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               ),
               data: (List<FinancialTransaction> rows) {
                 final List<FinancialTransaction> filtered = rows.where((row) {
+                  if (_accountFilter != null &&
+                      row.accountId != _accountFilter &&
+                      row.toAccountId != _accountFilter) {
+                    return false;
+                  }
                   if (_query.isEmpty) return true;
-                  final String searchable =
-                      '${row.note ?? ''} ${row.categoryId ?? ''}'.toLowerCase();
+                  final String searchable = <String>[
+                    row.note ?? '',
+                    categoryNames[row.categoryId] ?? '',
+                    accountNames[row.accountId] ?? '',
+                    accountNames[row.toAccountId] ?? '',
+                    row.type.label,
+                  ].join(' ').toLowerCase();
                   return searchable.contains(_query);
                 }).toList();
                 if (filtered.isEmpty) {
+                  final bool emptyLedger =
+                      rows.isEmpty &&
+                      _query.isEmpty &&
+                      _accountFilter == null &&
+                      _filter == null;
                   return EmptyState(
                     icon: Icons.receipt_long_outlined,
-                    title: rows.isEmpty
+                    title: emptyLedger
                         ? 'Belum ada transaksi'
                         : 'Tidak ada hasil',
-                    message: rows.isEmpty
+                    message: emptyLedger
                         ? 'Catat pemasukan, pengeluaran, atau transfer pertama.'
                         : 'Coba kata kunci atau filter lain.',
-                    action: rows.isEmpty
+                    action: emptyLedger
                         ? FilledButton.icon(
                             onPressed: () =>
                                 context.push(AppRoutes.transactionNew),
@@ -139,7 +173,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     AppSpacing.lg,
                     AppSpacing.sm,
                     AppSpacing.lg,
-                    AppSpacing.xxl * 3,
+                    AppSpacing.xxl * 4,
                   ),
                   itemCount: filtered.length,
                   separatorBuilder: (_, _) =>
@@ -147,9 +181,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   itemBuilder: (BuildContext context, int index) =>
                       _TransactionTile(
                         transaction: filtered[index],
-                        accountName: names[filtered[index].accountId] ?? 'Akun',
+                        accountName:
+                            accountNames[filtered[index].accountId] ?? 'Akun',
                         destinationName:
-                            names[filtered[index].toAccountId] ?? 'Akun tujuan',
+                            accountNames[filtered[index].toAccountId] ??
+                            'Akun tujuan',
                       ),
                 );
               },
@@ -159,6 +195,19 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
       ),
     );
   }
+}
+
+class _ChipRow extends StatelessWidget {
+  const _ChipRow({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+    child: Row(children: children),
+  );
 }
 
 class _FilterChip extends StatelessWidget {

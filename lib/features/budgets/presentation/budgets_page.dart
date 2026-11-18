@@ -178,10 +178,17 @@ class _BudgetsPageState extends ConsumerState<BudgetsPage> {
       );
       await repository.delete(progress.budget.id);
       if (mounted) ref.invalidate(budgetProgressProvider(_month));
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Anggaran gagal dihapus. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }
@@ -433,11 +440,18 @@ class _BudgetFormDialogState extends ConsumerState<_BudgetFormDialog> {
         await repository.updateLimit(progress.budget.id, amount);
       }
       if (mounted) Navigator.pop(context, true);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Anggaran gagal disimpan. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }

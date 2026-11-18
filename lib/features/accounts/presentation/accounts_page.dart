@@ -8,6 +8,7 @@ import '../../../core/database/repositories/accounts_repository.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -32,12 +33,14 @@ class AccountsPage extends ConsumerWidget {
             const ErrorStateView(message: 'Akun gagal dimuat.'),
         data: (List<Account> rows) {
           if (rows.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Text(
-                  'Belum ada akun. Tambahkan akun untuk mencatat transaksi.',
-                ),
+            return EmptyState(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Belum ada akun',
+              message: 'Tambahkan akun untuk mencatat transaksi.',
+              action: FilledButton.icon(
+                onPressed: () => _showAccountForm(context, ref),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Tambah akun'),
               ),
             );
           }
@@ -61,12 +64,23 @@ class AccountsPage extends ConsumerWidget {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(account.type.label),
-                      if (account.isArchived)
-                        const Text(
-                          'Diarsipkan',
-                          style: TextStyle(color: Colors.orange),
+                      Text.rich(
+                        TextSpan(
+                          children: <InlineSpan>[
+                            TextSpan(text: account.type.label),
+                            if (account.isArchived)
+                              TextSpan(
+                                text: ' · Diarsipkan',
+                                style: TextStyle(
+                                  color: AppColors.warningOf(
+                                    Theme.of(context).brightness,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
                       Consumer(
                         builder: (BuildContext context, WidgetRef ref, _) {
                           final AsyncValue<AccountBalance?> balance = ref.watch(
@@ -162,8 +176,15 @@ class AccountsPage extends ConsumerWidget {
     try {
       await repository.setArchived(account.id, archived);
       ref.invalidate(accountsProvider);
-    } on AppException catch (error) {
-      if (context.mounted) _showMessage(context, error.message);
+    } on Object catch (error) {
+      if (context.mounted) {
+        _showMessage(
+          context,
+          error is AppException
+              ? error.message
+              : 'Status akun gagal diubah. Silakan coba lagi.',
+        );
+      }
     }
   }
 
@@ -199,8 +220,15 @@ class AccountsPage extends ConsumerWidget {
     try {
       await repository.delete(account.id);
       ref.invalidate(accountsProvider);
-    } on AppException catch (error) {
-      if (context.mounted) _showMessage(context, error.message);
+    } on Object catch (error) {
+      if (context.mounted) {
+        _showMessage(
+          context,
+          error is AppException
+              ? error.message
+              : 'Akun gagal dihapus. Silakan coba lagi.',
+        );
+      }
     }
   }
 
@@ -325,11 +353,18 @@ class _AccountFormDialogState extends ConsumerState<_AccountFormDialog> {
         );
       }
       if (mounted) Navigator.pop(context, true);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Akun gagal disimpan. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }

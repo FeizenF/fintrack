@@ -50,7 +50,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             ref.invalidate(reportAccountBalancesProvider);
           },
           child: ListView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xxl * 3),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxl * 4),
             physics: const AlwaysScrollableScrollPhysics(),
             children: <Widget>[
               const TabPageHeader(

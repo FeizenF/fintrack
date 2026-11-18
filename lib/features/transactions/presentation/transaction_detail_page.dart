@@ -93,10 +93,17 @@ class TransactionDetailPage extends ConsumerWidget {
       await repository.delete(transactionId);
       ref.invalidate(transactionsProvider);
       if (context.mounted) context.pop();
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Transaksi gagal dihapus. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }

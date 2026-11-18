@@ -2,6 +2,7 @@
 abstract final class AppConstants {
   static const String appName = 'FinTrack';
   static const String appTagline = 'Personal Finance Manager';
+  static const String appVersion = '1.0.0';
 
   /// Maximum amount accepted for a single transaction (Rp 1 triliun).
   static const int maxTransactionAmount = 1000000000000;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
@@ -25,7 +26,7 @@ class SettingsPage extends StatelessWidget {
                 AppSpacing.lg,
                 0,
                 AppSpacing.lg,
-                AppSpacing.xxl * 2,
+                AppSpacing.xxl * 4,
               ),
               children: <Widget>[
                 AppCard(
@@ -77,7 +78,7 @@ class SettingsPage extends StatelessWidget {
                       _SettingsTile(
                         icon: Icons.tune_rounded,
                         title: 'Preferensi Aplikasi',
-                        subtitle: 'Tema, format dan preferensi tampilan',
+                        subtitle: 'Tema dan preferensi tampilan',
                         onTap: () => context.push(AppRoutes.preferences),
                       ),
                     ],
@@ -86,10 +87,10 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xl),
                 Center(
                   child: Text(
-                    'FinTrack 1.0.0',
+                    '${AppConstants.appName} ${AppConstants.appVersion}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],

@@ -5,6 +5,8 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/enums.dart';
 import '../../../core/database/repositories/categories_repository.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -55,10 +57,12 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage>
             _CategoryList(
               rows: rows.where((c) => c.kind == CategoryKind.expense).toList(),
               onAction: _handleAction,
+              onAdd: () => _showForm(context, CategoryKind.expense),
             ),
             _CategoryList(
               rows: rows.where((c) => c.kind == CategoryKind.income).toList(),
               onAction: _handleAction,
+              onAdd: () => _showForm(context, CategoryKind.income),
             ),
           ],
         ),
@@ -118,30 +122,59 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage>
         await repository.delete(category.id);
       }
       ref.invalidate(categoriesProvider);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Kategori gagal diubah. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }
 }
 
 class _CategoryList extends StatelessWidget {
-  const _CategoryList({required this.rows, required this.onAction});
+  const _CategoryList({
+    required this.rows,
+    required this.onAction,
+    required this.onAdd,
+  });
 
   final List<Category> rows;
   final Future<void> Function(Category category, String action) onAction;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    if (rows.isEmpty) return const Center(child: Text('Belum ada kategori.'));
+    if (rows.isEmpty) {
+      return EmptyState(
+        icon: Icons.category_outlined,
+        title: 'Belum ada kategori',
+        message: 'Tambahkan kategori untuk merapikan transaksi.',
+        action: OutlinedButton.icon(
+          onPressed: onAdd,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Tambah kategori'),
+        ),
+      );
+    }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.xxl * 3,
+      ),
       itemCount: rows.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (BuildContext context, int index) {
         final Category category = rows[index];
+        final String origin = category.isDefault ? 'Default' : 'Buatan sendiri';
         return Card(
           child: ListTile(
             leading: CircleAvatar(
@@ -152,7 +185,23 @@ class _CategoryList extends StatelessWidget {
               ),
             ),
             title: Text(category.name),
-            subtitle: Text(category.isDefault ? 'Default' : 'Buatan sendiri'),
+            subtitle: Text.rich(
+              TextSpan(
+                children: <InlineSpan>[
+                  TextSpan(text: origin),
+                  if (category.isArchived)
+                    TextSpan(
+                      text: ' · Diarsipkan',
+                      style: TextStyle(
+                        color: AppColors.warningOf(
+                          Theme.of(context).brightness,
+                        ),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
             trailing: PopupMenuButton<String>(
               tooltip: 'Aksi kategori ${category.name}',
               onSelected: (String value) {
@@ -234,11 +283,18 @@ class _CategoryFormDialogState extends ConsumerState<_CategoryFormDialog> {
         await repository.update(widget.category!.id, name: _name.text);
       }
       if (mounted) Navigator.pop(context, true);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is AppException
+                  ? error.message
+                  : 'Kategori gagal disimpan. Silakan coba lagi.',
+            ),
+          ),
+        );
       }
     }
   }

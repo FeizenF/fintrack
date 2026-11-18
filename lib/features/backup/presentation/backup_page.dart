@@ -13,6 +13,7 @@ import '../../../core/services/backup_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/backup_codec.dart';
 import '../../../core/utils/csv_exporter.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../shared/providers/backup_providers.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -115,8 +116,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                         decoration: const InputDecoration(
                           labelText: 'Ulangi password',
                         ),
-                        validator: (String? value) => first.text.isNotEmpty &&
-                                value != first.text
+                        validator: (String? value) =>
+                            first.text.isNotEmpty && value != first.text
                             ? 'Konfirmasi password tidak sama.'
                             : null,
                       ),
@@ -125,7 +126,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         error!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                   ],
@@ -144,9 +147,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                 FilledButton(
                   onPressed: () {
                     if (first.text.isEmpty) {
-                      setDialogState(() => error =
-                          confirm ? 'Pilih enkripsi atau backup tanpa enkripsi.' :
-                              'Password wajib diisi.');
+                      setDialogState(
+                        () => error = confirm
+                            ? 'Pilih enkripsi atau backup tanpa enkripsi.'
+                            : 'Password wajib diisi.',
+                      );
                       return;
                     }
                     if (formKey.currentState?.validate() ?? false) {
@@ -224,12 +229,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<void> _exportCsv() async {
-    final TransactionsRepository transactions =
-        TransactionsRepository(await _database());
-    final List<FinancialTransaction> rows = await transactions.list();
-    final List<Account> accounts = await AccountsRepository(
+    final TransactionsRepository transactions = TransactionsRepository(
       await _database(),
-    ).list(includeArchived: true);
+    );
+    final List<FinancialTransaction> rows = await transactions.list();
+    final List<Account> accounts = await AccountsRepository(await _database())
+        .list(includeArchived: true);
     final List<Category> categories = await CategoriesRepository(
       await _database(),
     ).list(includeArchived: true);
@@ -239,18 +244,20 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final Map<int, Category> categoriesById = <int, Category>{
       for (final Category category in categories) category.id: category,
     };
-    final List<ExportTransaction> exportRows = rows.map((FinancialTransaction row) {
-      return ExportTransaction(
-        transaction: row,
-        sourceAccount: accountsById[row.accountId]?.name ?? 'Akun dihapus',
-        destinationAccount: row.toAccountId == null
-            ? null
-            : accountsById[row.toAccountId]?.name ?? 'Akun dihapus',
-        category: row.categoryId == null
-            ? null
-            : categoriesById[row.categoryId]?.name ?? 'Kategori dihapus',
-      );
-    }).toList(growable: false);
+    final List<ExportTransaction> exportRows = rows
+        .map((FinancialTransaction row) {
+          return ExportTransaction(
+            transaction: row,
+            sourceAccount: accountsById[row.accountId]?.name ?? 'Akun dihapus',
+            destinationAccount: row.toAccountId == null
+                ? null
+                : accountsById[row.toAccountId]?.name ?? 'Akun dihapus',
+            category: row.categoryId == null
+                ? null
+                : categoriesById[row.categoryId]?.name ?? 'Kategori dihapus',
+          );
+        })
+        .toList(growable: false);
     final Uri? saved = await FilePicker.saveFile(
       fileName: 'fintrack-transaksi-${_stamp(DateTime.now())}.csv',
       bytes: Uint8List.fromList(CsvExporter.encode(exportRows)),
@@ -265,13 +272,17 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     return state.when(
       data: (AppDatabase database) => database,
       loading: () => throw StateError('Database belum siap.'),
-      error: (Object error, StackTrace stack) => Error.throwWithStackTrace(error, stack),
+      error: (Object error, StackTrace stack) =>
+          Error.throwWithStackTrace(error, stack),
     );
   }
 
   Future<void> _saveLastBackup(DateTime date) async {
     final AppDatabase database = await _database();
-    await database.saveSetting(SettingKeys.lastBackupAt, date.toUtc().toIso8601String());
+    await database.saveSetting(
+      SettingKeys.lastBackupAt,
+      date.toUtc().toIso8601String(),
+    );
   }
 
   String _stamp(DateTime date) =>
@@ -290,22 +301,25 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   String _errorMessage(Object error) => error is FormatException
       ? error.message
       : error is ArgumentError
-          ? error.message?.toString() ?? 'Data tidak valid.'
-          : 'Operasi gagal. Periksa file dan coba lagi.';
+      ? error.message?.toString() ?? 'Data tidak valid.'
+      : 'Operasi gagal. Periksa file dan coba lagi.';
 
   void _showMessage(String message, {bool error = false}) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AsyncValue<BackupService> service = ref.watch(backupServiceProvider);
+    final DateTime? lastBackup = ref.watch(lastBackupAtProvider).value;
     return Scaffold(
       appBar: AppBar(title: const Text('Backup & Restore')),
       body: ListView(
@@ -315,7 +329,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Icon(Icons.backup_outlined, color: theme.colorScheme.primary, size: 30),
+                Icon(
+                  Icons.backup_outlined,
+                  color: theme.colorScheme.primary,
+                  size: 30,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text('Salinan data lokal', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),
@@ -325,15 +343,43 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      lastBackup == null
+                          ? Icons.info_outline_rounded
+                          : Icons.history_rounded,
+                      size: 18,
+                      color: AppColors.mutedTextOf(theme.brightness),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        lastBackup == null
+                            ? 'Belum pernah membuat backup di perangkat ini.'
+                            : 'Backup terakhir: '
+                                  '${Formatters.shortDateTime(lastBackup)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.mutedTextOf(theme.brightness),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 FilledButton.icon(
-                  onPressed: _busy || !service.hasValue ? null : () => _run(_createBackup),
+                  onPressed: _busy || !service.hasValue
+                      ? null
+                      : () => _run(_createBackup),
                   icon: const Icon(Icons.save_alt_rounded),
                   label: const Text('Buat backup'),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 OutlinedButton.icon(
-                  onPressed: _busy || !service.hasValue ? null : () => _run(_restoreBackup),
+                  onPressed: _busy || !service.hasValue
+                      ? null
+                      : () => _run(_restoreBackup),
                   icon: const Icon(Icons.restore_rounded),
                   label: const Text('Pulihkan dari file'),
                 ),
@@ -345,7 +391,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Icon(Icons.table_view_outlined, color: theme.colorScheme.primary, size: 30),
+                Icon(
+                  Icons.table_view_outlined,
+                  color: theme.colorScheme.primary,
+                  size: 30,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Text('Ekspor transaksi', style: theme.textTheme.titleLarge),
                 const SizedBox(height: AppSpacing.sm),

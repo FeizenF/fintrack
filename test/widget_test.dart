@@ -26,7 +26,9 @@ Widget scopedApp() {
     overrides: [
       // The lock gate reads secure storage; pin it to "no PIN" so routing tests
       // never wait on a platform channel that has no plugin in the test host.
-      pinProtectionEnabledProvider.overrideWithValue(const AsyncData<bool>(false)),
+      pinProtectionEnabledProvider.overrideWithValue(
+        const AsyncData<bool>(false),
+      ),
       accountsProvider.overrideWithValue(
         const AsyncData<List<Account>>(<Account>[]),
       ),
@@ -153,8 +155,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Akun Keuangan'), findsWidgets);
+    expect(find.text('Belum ada akun'), findsOneWidget);
     expect(
-      find.text('Belum ada akun. Tambahkan akun untuk mencatat transaksi.'),
+      find.text('Tambahkan akun untuk mencatat transaksi.'),
       findsOneWidget,
     );
   });

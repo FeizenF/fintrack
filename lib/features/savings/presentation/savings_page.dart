@@ -129,8 +129,15 @@ class SavingsPage extends ConsumerWidget {
       );
       await repository.setGoalArchived(progress.goal.id, archive);
       ref.invalidate(archivedSavingsProgressProvider);
-    } on AppException catch (error) {
-      if (context.mounted) _showMessage(context, error.message);
+    } on Object catch (error) {
+      if (context.mounted) {
+        _showMessage(
+          context,
+          error is AppException
+              ? error.message
+              : 'Status target gagal diubah. Silakan coba lagi.',
+        );
+      }
     }
   }
 
@@ -168,8 +175,15 @@ class SavingsPage extends ConsumerWidget {
       );
       await repository.deleteGoal(progress.goal.id);
       ref.invalidate(archivedSavingsProgressProvider);
-    } on AppException catch (error) {
-      if (context.mounted) _showMessage(context, error.message);
+    } on Object catch (error) {
+      if (context.mounted) {
+        _showMessage(
+          context,
+          error is AppException
+              ? error.message
+              : 'Target gagal dihapus. Silakan coba lagi.',
+        );
+      }
     }
   }
 
@@ -459,11 +473,18 @@ class _GoalFormDialogState extends ConsumerState<_GoalFormDialog> {
         );
       }
       if (mounted) Navigator.pop(context, true);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is AppException
+                ? error.message
+                : 'Data gagal disimpan. Silakan coba lagi.',
+          ),
+        ),
+      );
     }
   }
 }
@@ -611,11 +632,18 @@ class _ContributionDialogState extends ConsumerState<_ContributionDialog> {
         );
       }
       if (mounted) Navigator.pop(context, true);
-    } on AppException catch (error) {
+    } on Object catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is AppException
+                ? error.message
+                : 'Data gagal disimpan. Silakan coba lagi.',
+          ),
+        ),
+      );
     }
   }
 }

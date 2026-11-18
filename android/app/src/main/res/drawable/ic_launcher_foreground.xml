@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gold ascending bars on the navy adaptive-icon background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M38,60 L46,60 L46,74 L38,74 Z" />
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M50,48 L58,48 L58,74 L50,74 Z" />
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M62,36 L70,36 L70,74 L62,74 Z" />
+</vector>
