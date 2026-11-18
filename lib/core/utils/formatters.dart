@@ -47,6 +47,13 @@ abstract final class Formatters {
   /// `Rp 1.250.000`
   static String currency(int amount) => _currency.format(amount);
 
+  /// Rupiah amount, or a fixed-width mask when balances are hidden.
+  ///
+  /// The mask keeps the layout width stable so hiding balances does not make
+  /// the surrounding cards jump.
+  static String maskedCurrency(int amount, {required bool hidden}) =>
+      hidden ? '••••••' : currency(amount);
+
   /// `Rp 1,2 jt` — for tight spaces such as charts.
   static String compactCurrency(int amount) => _compactCurrency.format(amount);
 

@@ -214,7 +214,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   }
 
   String _delayLabel(int seconds) {
-    if (seconds == 0) return 'Segera setelah aplikasi ditinggalkan';
+    if (seconds == 0) return 'Segera setelah keluar';
     if (seconds < 60) return 'Setelah $seconds detik';
     return 'Setelah ${seconds ~/ 60} menit';
   }
@@ -310,6 +310,9 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                       const SizedBox(height: AppSpacing.md),
                       DropdownButtonFormField<int>(
                         initialValue: _autoLockSeconds,
+                        // The dropdown shares a row with the field padding; without
+                        // this the longest delay label overflowed the card.
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Jeda sebelum terkunci',
                         ),

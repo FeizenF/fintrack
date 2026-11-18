@@ -8,6 +8,7 @@ import '../../../core/utils/date_range.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/report_series.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/cash_flow_summary.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
@@ -291,38 +292,9 @@ class _TrendCard extends StatelessWidget {
                       'Total periode tidak tersedia.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    data: (MonthlyTotals value) => Row(
-                      children: <Widget>[
-                        Expanded(
-                          child: _Metric(
-                            label: 'Pemasukan',
-                            value: Formatters.currency(value.income),
-                            color: AppColors.incomeOf(
-                              Theme.of(context).brightness,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: _Metric(
-                            label: 'Pengeluaran',
-                            value: Formatters.currency(value.expense),
-                            color: AppColors.expenseOf(
-                              Theme.of(context).brightness,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: _Metric(
-                            label: 'Selisih',
-                            value: Formatters.currency(value.net),
-                            color: value.net < 0
-                                ? AppColors.expenseOf(
-                                    Theme.of(context).brightness,
-                                  )
-                                : Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ],
+                    data: (MonthlyTotals value) => CashFlowSummary(
+                      income: value.income,
+                      expense: value.expense,
                     ),
                   ),
                 ],
@@ -500,46 +472,37 @@ class _ComparisonCard extends StatelessWidget {
           else if (!ready)
             const LoadingState(message: 'Memuat perbandingan...')
           else ...<Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: _ChangeMetric(
-                    label: 'Pemasukan',
-                    currentValue: now.income,
-                    change: percentChange(
-                      current: now.income,
-                      previous: before.income,
-                    ),
-                    positiveIsGood: true,
-                  ),
-                ),
-                Expanded(
-                  child: _ChangeMetric(
-                    label: 'Pengeluaran',
-                    currentValue: now.expense,
-                    change: percentChange(
-                      current: now.expense,
-                      previous: before.expense,
-                    ),
-                    positiveIsGood: false,
-                  ),
-                ),
-                Expanded(
-                  child: _ChangeMetric(
-                    label: 'Selisih',
-                    currentValue: now.net,
-                    change: percentChange(
-                      current: now.net,
-                      previous: before.net,
-                    ),
-                    positiveIsGood: true,
-                  ),
-                ),
-              ],
+            _ChangeRow(
+              label: 'Pemasukan',
+              currentValue: now.income,
+              change: percentChange(
+                current: now.income,
+                previous: before.income,
+              ),
+              positiveIsGood: true,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ChangeRow(
+              label: 'Pengeluaran',
+              currentValue: now.expense,
+              change: percentChange(
+                current: now.expense,
+                previous: before.expense,
+              ),
+              positiveIsGood: false,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ChangeRow(
+              label: 'Selisih',
+              currentValue: now.net,
+              change: percentChange(current: now.net, previous: before.net),
+              positiveIsGood: true,
             ),
             const SizedBox(height: AppSpacing.lg),
+            const Divider(height: 1),
+            const SizedBox(height: AppSpacing.lg),
             SizedBox(
-              height: 150,
+              height: 160,
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
@@ -548,7 +511,35 @@ class _ComparisonCard extends StatelessWidget {
                   barTouchData: BarTouchData(enabled: false),
                   gridData: const FlGridData(show: false),
                   borderData: FlBorderData(show: false),
-                  titlesData: const FlTitlesData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 26,
+                        interval: 1,
+                        getTitlesWidget: (double value, TitleMeta meta) => Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: Text(
+                            value.round() == 0 ? 'Pemasukan' : 'Pengeluaran',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: AppColors.mutedTextOf(brightness),
+                                  fontSize: 10,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   barGroups: <BarChartGroupData>[
                     _group(
                       0,
@@ -629,8 +620,8 @@ class _ComparisonCard extends StatelessWidget {
   }
 }
 
-class _ChangeMetric extends StatelessWidget {
-  const _ChangeMetric({
+class _ChangeRow extends StatelessWidget {
+  const _ChangeRow({
     required this.label,
     required this.currentValue,
     required this.change,
@@ -658,40 +649,99 @@ class _ChangeMetric extends StatelessWidget {
         ? AppColors.incomeOf(brightness)
         : AppColors.expenseOf(brightness);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: AppColors.mutedTextOf(brightness),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.mutedTextOf(brightness),
+                ),
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  Formatters.currency(currentValue),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            Formatters.currency(currentValue),
-            style: theme.textTheme.titleSmall,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value == null
-              ? 'Belum ada pembanding'
-              : '${value > 0
-                        ? '+'
-                        : value < 0
-                        ? '−'
-                        : ''}'
-                    '${Formatters.percent(value.abs())}',
-          style: theme.textTheme.bodySmall?.copyWith(
+        const SizedBox(width: AppSpacing.sm),
+        if (value == null)
+          Text(
+            'Belum ada pembanding',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          _DeltaChip(
+            label:
+                '${value > 0
+                    ? '+'
+                    : value < 0
+                    ? '−'
+                    : ''}'
+                '${Formatters.percent(value.abs())}',
+            rising: value >= 0,
             color: color,
-            fontWeight: FontWeight.w600,
           ),
-        ),
       ],
+    );
+  }
+}
+
+/// Pill-shaped percentage change badge.
+class _DeltaChip extends StatelessWidget {
+  const _DeltaChip({
+    required this.label,
+    required this.rising,
+    required this.color,
+  });
+
+  final String label;
+  final bool rising;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            rising ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -997,46 +1047,6 @@ class _AccountsCard extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

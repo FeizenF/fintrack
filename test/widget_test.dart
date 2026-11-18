@@ -109,7 +109,7 @@ void main() {
       'Transaksi',
       'Anggaran',
       'Laporan',
-      'Pengaturan',
+      'Setelan',
     ]) {
       expect(find.text(label), findsWidgets, reason: 'missing tab $label');
     }
@@ -128,7 +128,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Pengaturan').first);
+    await tester.tap(find.text('Setelan').first);
     await tester.pumpAndSettle();
     expect(find.text('Data, keamanan dan preferensi aplikasi'), findsOneWidget);
   });
@@ -149,7 +149,7 @@ void main() {
   ) async {
     await pumpPhoneApp(tester);
 
-    await tester.tap(find.text('Pengaturan').first);
+    await tester.tap(find.text('Setelan').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Akun Keuangan'));
     await tester.pumpAndSettle();

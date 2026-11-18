@@ -126,11 +126,21 @@ abstract final class AppTheme {
             ? AppColors.gold.withValues(alpha: 0.18)
             : AppColors.navy.withValues(alpha: 0.08),
         elevation: 0,
-        height: 68,
+        // Keep room for a single-line label under the icon: a squeezed bar
+        // wrapped the longest label onto a second, clipped line.
+        height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelPadding: const EdgeInsets.only(top: 2),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final bool selected = states.contains(WidgetState.selected);
+          // Compact 11sp with no tracking is what keeps the longest label
+          // ("Transaksi") on one line inside a 64dp destination slot. With the
+          // previous 12sp + 0.5 tracking, "Pengaturan" wrapped and its final
+          // letter hung on a second line, which read as misaligned labels.
           return textTheme.labelSmall?.copyWith(
+            fontSize: 11,
+            height: 1.15,
+            letterSpacing: 0,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             color: selected
                 ? (isDark ? AppColors.goldSoft : AppColors.navy)

@@ -40,12 +40,9 @@ class AppShell extends StatelessWidget {
       floatingActionButton: fab,
       bottomNavigationBar: wide
           ? null
-          : NavigationBar(
+          : _BottomNavBar(
               selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: _onDestinationSelected,
-              destinations: AppShellDestination.values
-                  .map((AppShellDestination destination) => destination.destination)
-                  .toList(growable: false),
+              onSelected: _onDestinationSelected,
             ),
     );
 
@@ -84,6 +81,42 @@ class AppShell extends StatelessWidget {
           const VerticalDivider(width: 1),
           Expanded(child: content),
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom navigation with a hairline separator and a clamped label scale.
+///
+/// Accessibility font scaling is capped at 1.2 inside the bar only: navigation
+/// labels are single-line by design, and letting them grow without bound is
+/// what pushed the last letter of a label onto a second line.
+class _BottomNavBar extends StatelessWidget {
+  const _BottomNavBar({required this.selectedIndex, required this.onSelected});
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.2,
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onSelected,
+          destinations: AppShellDestination.values
+              .map((AppShellDestination destination) => destination.destination)
+              .toList(growable: false),
+        ),
       ),
     );
   }

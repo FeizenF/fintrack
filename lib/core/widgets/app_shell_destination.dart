@@ -6,7 +6,7 @@ enum AppShellDestination {
   transactions('Transaksi', Icons.receipt_long_outlined, Icons.receipt_long_rounded),
   budgets('Anggaran', Icons.pie_chart_outline_rounded, Icons.pie_chart_rounded),
   reports('Laporan', Icons.query_stats_outlined, Icons.query_stats_rounded),
-  settings('Pengaturan', Icons.tune_outlined, Icons.tune_rounded);
+  settings('Setelan', Icons.tune_outlined, Icons.tune_rounded);
 
   const AppShellDestination(this.label, this.icon, this.selectedIcon);
 
