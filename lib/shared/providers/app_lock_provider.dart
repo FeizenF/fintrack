@@ -20,6 +20,7 @@ class AppLockController extends Notifier<bool> {
     ref.invalidate(pinRecordUsableProvider);
     ref.invalidate(pinProtectionEnabledProvider);
     ref.invalidate(biometricProtectionEnabledProvider);
+    ref.invalidate(autoLockSecondsProvider);
   }
 }
 

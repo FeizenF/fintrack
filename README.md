@@ -80,7 +80,7 @@ test/         # unit, repository, widget tests
 - Backup dapat dienkripsi dengan AES-256-GCM; kunci diturunkan melalui PBKDF2-HMAC-SHA256. Password tidak disimpan. Simpan password secara terpisah: kehilangan password membuat backup terenkripsi tidak dapat dipulihkan.
 - CSV transaksi memakai UTF-8 BOM, CRLF, semua field di-quote, dan prefiks aman terhadap spreadsheet formula injection.
 - PIN opsional 4–8 digit disimpan sebagai salted PBKDF2 hash di `flutter_secure_storage`. Biometrik opsional memakai `local_auth`; auto-lock tersedia saat kembali dari latar belakang. Jika status keamanan lokal gagal dibaca, aplikasi tetap terkunci dan menyediakan retry.
-- Verifikasi: `flutter test` lulus (170 tes); `flutter analyze --no-pub` tanpa error/warning analyzer; `flutter build apk --release` menghasilkan APK release (62.3 MB). Android memakai `FLAG_SECURE` untuk mencegah screenshot dan pratinjau task switcher.
+- Verifikasi: `flutter test --reporter expanded` lulus (171 tes); `flutter analyze --no-pub` tanpa warning/error (4 info lint `prefer_initializing_formals`); `flutter build apk --release` berhasil menghasilkan APK 62.3 MB. Android memakai `FLAG_SECURE` untuk mencegah screenshot dan pratinjau task switcher.
 - Pembatasan percobaan PIN belum diterapkan; PIN minimum 4 digit, jadi jangan anggap app lock sebagai perlindungan terhadap penyerang dengan akses perangkat fisik.
 - Attachment transaksi menyimpan path lokal, bukan isi file. File attachment tidak termasuk backup dan dapat hilang saat pindah perangkat atau instal ulang.
 

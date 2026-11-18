@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../constants/app_constants.dart';
 import '../database/app_database.dart';
 import '../theme/app_colors.dart';
 import '../../shared/providers/app_lock_provider.dart';

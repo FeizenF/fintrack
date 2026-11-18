@@ -156,6 +156,41 @@ void main() {
     expect(find.text('UNLOCKED_CONTENT'), findsNothing);
   });
 
+  testWidgets('reset invalidates cached auto-lock preference', (
+    WidgetTester tester,
+  ) async {
+    int autoLockReads = 0;
+    late ProviderContainer container;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(),
+          ),
+          pinProtectionEnabledProvider.overrideWith((_) async => false),
+          biometricProtectionEnabledProvider.overrideWith((_) async => false),
+          autoLockSecondsProvider.overrideWith((Ref ref) {
+            autoLockReads++;
+            return Future<int>.value(300);
+          }),
+        ],
+        child: Builder(
+          builder: (BuildContext context) {
+            container = ProviderScope.containerOf(context);
+            return const MaterialApp(home: SizedBox.shrink());
+          },
+        ),
+      ),
+    );
+    await container.read(autoLockSecondsProvider.future);
+    expect(autoLockReads, 1);
+
+    container.read(appLockControllerProvider.notifier).reset();
+    await tester.pump();
+    await container.read(autoLockSecondsProvider.future);
+    expect(autoLockReads, 2);
+  });
+
   testWidgets('AppLockGate locks immediately if auto-lock preference fails', (
     WidgetTester tester,
   ) async {
