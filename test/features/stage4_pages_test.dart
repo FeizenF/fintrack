@@ -164,7 +164,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     expect(find.textContaining('Terpakai Rp 85.000'), findsOneWidget);
 
-    await tester.tap(find.text('Tambah anggaran'));
+    await tester.tap(find.byTooltip('Tambah anggaran'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), '250000');
     await tester.tap(find.widgetWithText(FilledButton, 'Simpan'));
@@ -233,6 +233,8 @@ void main() {
     expect(find.text('Rp 500.000'), findsOneWidget);
     expect(find.text('Rp 200.000'), findsOneWidget);
     expect(find.text('Rp 75.000'), findsOneWidget);
+    expect(find.text('Surplus'), findsOneWidget);
+    expect(find.textContaining('dari pemasukan'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Sembunyikan saldo'));
     await tester.pumpAndSettle();

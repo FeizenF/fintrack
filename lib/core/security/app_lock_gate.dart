@@ -102,20 +102,23 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     if (!mounted) return;
     final Duration elapsed = DateTime.now().difference(backgroundedAt);
     if (elapsed.inSeconds >= delaySeconds) {
+      // Drop focus before the lock layer covers the content so the keyboard
+      // does not stay open above the PIN screen.
+      FocusManager.instance.primaryFocus?.unfocus();
       ref.read(appLockControllerProvider.notifier).lock();
     }
   }
 
   Future<void> _authenticate() async {
     if (_biometricRunning || !mounted) return;
-    setState(() => _biometricRunning = true);
+    _biometricRunning = true;
     try {
       final bool ok = await authenticateWithBiometrics(ref);
       if (ok && mounted) ref.read(appLockControllerProvider.notifier).unlock();
     } on Object {
       // Cancelled or unavailable biometrics simply leave the PIN pad visible.
     } finally {
-      if (mounted) setState(() => _biometricRunning = false);
+      _biometricRunning = false;
     }
   }
 
@@ -226,25 +229,36 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   Widget build(BuildContext context) {
+    final bool unlocked = ref.watch(appLockControllerProvider);
+    final AsyncValue<bool> pinEnabled = ref.watch(pinProtectionEnabledProvider);
+    // No PIN configured means there is nothing to unlock. Treat that as open
+    // immediately instead of flashing a splash while the setting resolves.
+    final bool noPinConfigured =
+        pinEnabled is AsyncData<bool> && !pinEnabled.value;
+    final bool lockVisible = !unlocked && !noPinConfigured;
+
+    // The app content is only hidden, never unmounted: tearing down the router
+    // (and any open dialog or half-filled form) on every lock/unlock was what
+    // produced the `_dependents.isEmpty` framework assertion.
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        TickerMode(
+          enabled: !lockVisible,
+          child: Offstage(offstage: lockVisible, child: widget.child),
+        ),
+        if (lockVisible) Positioned.fill(child: _buildLockLayer()),
+      ],
+    );
+  }
+
+  Widget _buildLockLayer() {
     final AsyncValue<bool> pinEnabled = ref.watch(pinProtectionEnabledProvider);
     final AsyncValue<bool> pinRecordExists = ref.watch(pinRecordUsableProvider);
     final AsyncValue<bool> biometricEnabled = ref.watch(
       biometricProtectionEnabledProvider,
     );
-    final bool unlocked = ref.watch(appLockControllerProvider);
-
-    if (unlocked && pinEnabled is AsyncData<bool> && !pinEnabled.value) {
-      return widget.child;
-    }
-    if (unlocked &&
-        pinEnabled is AsyncData<bool> &&
-        pinEnabled.value &&
-        pinRecordExists is AsyncData<bool> &&
-        pinRecordExists.value) {
-      return widget.child;
-    }
     return switch (pinEnabled) {
-      AsyncData<bool>(value: false) => widget.child,
       AsyncData<bool>(value: true) => switch (pinRecordExists) {
         AsyncData<bool>(value: false) => _PinRecoveryScreen(
           onReset: _resetMissingPin,
@@ -256,13 +270,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
           AsyncData<bool>(value: true) => _LockScreen(
             onSubmit: _verifyPin,
             onBiometric: _authenticate,
-            biometricBusy: _biometricRunning,
             showBiometric: true,
           ),
           AsyncData<bool>(value: false) => _LockScreen(
             onSubmit: _verifyPin,
             onBiometric: _authenticate,
-            biometricBusy: _biometricRunning,
             showBiometric: false,
           ),
           AsyncError<bool>() => _LockUnavailable(
@@ -316,17 +328,22 @@ class _PinRecoveryScreen extends StatelessWidget {
   );
 }
 
+/// PIN entry for the lock screen.
+///
+/// This layer is rendered above the [Navigator] (the whole app is hidden behind
+/// it), which means there is no [Overlay] ancestor. A [TextField] would need
+/// one for its selection handles and would crash with "No Overlay widget
+/// found", so the lock screen uses its own numeric keypad instead. It also
+/// avoids pulling up the system keyboard over the lock screen.
 class _LockScreen extends StatefulWidget {
   const _LockScreen({
     required this.onSubmit,
     required this.onBiometric,
-    required this.biometricBusy,
     required this.showBiometric,
   });
 
   final Future<void> Function(String pin) onSubmit;
   final Future<void> Function() onBiometric;
-  final bool biometricBusy;
   final bool showBiometric;
 
   @override
@@ -334,21 +351,36 @@ class _LockScreen extends StatefulWidget {
 }
 
 class _LockScreenState extends State<_LockScreen> {
-  final TextEditingController _controller = TextEditingController();
+  String _pin = '';
   String? _error;
   bool _busy = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  bool get _canSubmit => !_busy && PinHasher.isValidPin(_pin);
+
+  void _append(String digit) {
+    if (_busy || _pin.length >= PinHasher.maxPinLength) return;
+    setState(() {
+      _pin += digit;
+      _error = null;
+    });
+  }
+
+  void _backspace() {
+    if (_busy || _pin.isEmpty) return;
+    setState(() {
+      _pin = _pin.substring(0, _pin.length - 1);
+      _error = null;
+    });
   }
 
   Future<void> _submit() async {
-    final String pin = _controller.text;
     if (_busy) return;
-    if (!PinHasher.isValidPin(pin)) {
-      setState(() => _error = 'Masukkan PIN 4–8 digit.');
+    if (!PinHasher.isValidPin(_pin)) {
+      setState(
+        () => _error =
+            'Masukkan PIN ${PinHasher.minPinLength}–'
+            '${PinHasher.maxPinLength} digit.',
+      );
       return;
     }
     setState(() {
@@ -356,10 +388,15 @@ class _LockScreenState extends State<_LockScreen> {
       _error = null;
     });
     try {
-      await widget.onSubmit(pin);
-      if (mounted) _controller.clear();
+      await widget.onSubmit(_pin);
+      if (mounted) setState(() => _pin = '');
     } on Object {
-      if (mounted) setState(() => _error = 'PIN salah.');
+      if (mounted) {
+        setState(() {
+          _error = 'PIN salah.';
+          _pin = '';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -375,66 +412,59 @@ class _LockScreenState extends State<_LockScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.xl),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
+              constraints: const BoxConstraints(maxWidth: 320),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Icon(
                     Icons.lock_outline_rounded,
-                    size: 48,
+                    size: 40,
                     color: theme.colorScheme.primary,
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     'FinTrack terkunci',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Masukkan PIN untuk melanjutkan.',
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    maxLength: PinHasher.maxPinLength,
-                    enabled: !_busy,
-                    onSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'PIN',
-                      errorText: _error,
-                      counterText: '',
-                    ),
-                  ),
                   const SizedBox(height: AppSpacing.md),
-                  FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    child: _busy
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Buka'),
+                  _PinDots(length: _pin.length, busy: _busy),
+                  SizedBox(
+                    height: 20,
+                    child: _error == null
+                        ? null
+                        : Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
                   ),
-                  if (widget.showBiometric) ...<Widget>[
-                    const SizedBox(height: AppSpacing.sm),
-                    TextButton.icon(
-                      onPressed: widget.biometricBusy
-                          ? null
-                          : widget.onBiometric,
-                      icon: const Icon(Icons.fingerprint_rounded),
-                      label: const Text('Gunakan biometrik'),
-                    ),
-                  ],
+                  const SizedBox(height: AppSpacing.xs),
+                  _Keypad(
+                    enabled: !_busy,
+                    showBiometric: widget.showBiometric,
+                    onDigit: _append,
+                    onBackspace: _backspace,
+                    onBiometric: widget.onBiometric,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  FilledButton(
+                    onPressed: _canSubmit ? _submit : null,
+                    child: const Text('Buka'),
+                  ),
                 ],
               ),
             ),
@@ -442,6 +472,169 @@ class _LockScreenState extends State<_LockScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Filled dots for the digits entered so far, with empty slots up to the
+/// minimum PIN length so the expected size is visible from the start.
+class _PinDots extends StatelessWidget {
+  const _PinDots({required this.length, required this.busy});
+
+  final int length;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final int slots = length > PinHasher.minPinLength
+        ? length
+        : PinHasher.minPinLength;
+    return Semantics(
+      label: 'PIN terisi $length digit',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          for (int i = 0; i < slots; i++)
+            Container(
+              key: ValueKey<String>('pin-dot-$i'),
+              width: 12,
+              height: 12,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < length
+                    ? theme.colorScheme.primary
+                    : Colors.transparent,
+                border: Border.all(
+                  color: i < length
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant,
+                  width: 1.5,
+                ),
+              ),
+            ),
+          if (busy) ...<Widget>[
+            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(
+              height: 12,
+              width: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Keypad extends StatelessWidget {
+  const _Keypad({
+    required this.enabled,
+    required this.showBiometric,
+    required this.onDigit,
+    required this.onBackspace,
+    required this.onBiometric,
+  });
+
+  final bool enabled;
+  final bool showBiometric;
+  final ValueChanged<String> onDigit;
+  final VoidCallback onBackspace;
+  final Future<void> Function() onBiometric;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<List<Widget>> rows = <List<Widget>>[
+      <Widget>[
+        _KeypadKey.digit('1', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('2', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('3', onTap: enabled ? onDigit : null),
+      ],
+      <Widget>[
+        _KeypadKey.digit('4', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('5', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('6', onTap: enabled ? onDigit : null),
+      ],
+      <Widget>[
+        _KeypadKey.digit('7', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('8', onTap: enabled ? onDigit : null),
+        _KeypadKey.digit('9', onTap: enabled ? onDigit : null),
+      ],
+      <Widget>[
+        if (showBiometric)
+          _KeypadKey(
+            semanticLabel: 'Gunakan biometrik',
+            onTap: enabled ? onBiometric : null,
+            child: const Icon(Icons.fingerprint_rounded, size: 24),
+          )
+        else
+          const SizedBox.shrink(),
+        _KeypadKey.digit('0', onTap: enabled ? onDigit : null),
+        _KeypadKey(
+          semanticLabel: 'Hapus digit',
+          onTap: enabled ? onBackspace : null,
+          child: const Icon(Icons.backspace_outlined, size: 22),
+        ),
+      ],
+    ];
+
+    return Column(
+      children: <Widget>[
+        for (final List<Widget> row in rows)
+          Row(
+            children: <Widget>[
+              for (final Widget key in row)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xs / 2),
+                    child: key,
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _KeypadKey extends StatelessWidget {
+  _KeypadKey.digit(String digit, {required ValueChanged<String>? onTap})
+    : semanticLabel = null,
+      onTap = onTap == null ? null : (() => onTap(digit)),
+      child = Text(digit, style: const TextStyle(fontSize: 22));
+
+  const _KeypadKey({
+    required this.semanticLabel,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String? semanticLabel;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final sized = SizedBox(
+      height: 52,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          foregroundColor: theme.colorScheme.onSurface,
+          backgroundColor: theme.colorScheme.surfaceContainerHigh,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(14)),
+          ),
+          minimumSize: Size.zero,
+          padding: EdgeInsets.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: child,
+      ),
+    );
+    if (semanticLabel == null) return sized;
+    return Semantics(label: semanticLabel, button: true, child: sized);
   }
 }
 

@@ -45,96 +45,124 @@ class _BudgetsPageState extends ConsumerState<BudgetsPage> {
         title: const Text('Anggaran'),
         actions: <Widget>[
           IconButton(
-            tooltip: 'Bulan sebelumnya',
-            onPressed: () => _shiftMonth(-1),
-            icon: const Icon(Icons.chevron_left_rounded),
+            tooltip: 'Tambah anggaran',
+            onPressed: () => _openForm(),
+            icon: const Icon(Icons.add_rounded),
           ),
-          Center(
-            child: Text(
-              Formatters.monthYear(_month),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Bulan berikutnya',
-            onPressed: () => _shiftMonth(1),
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpacing.xs),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openForm(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Tambah anggaran'),
-      ),
-      body: value.when(
-        loading: () => const LoadingState(message: 'Memuat anggaran...'),
-        error: (Object error, StackTrace stack) => ErrorStateView(
-          message: 'Anggaran gagal dimuat.',
-          onRetry: () => ref.invalidate(budgetProgressProvider(_month)),
-        ),
-        data: (List<BudgetProgress> rows) {
-          if (rows.isEmpty) {
-            return EmptyState(
-              icon: Icons.pie_chart_outline_rounded,
-              title: 'Belum ada anggaran',
-              message:
-                  'Atur batas pengeluaran per kategori untuk ${Formatters.monthYear(_month)}.',
-              action: FilledButton.icon(
-                onPressed: () => _openForm(),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Tambah anggaran'),
-              ),
-            );
-          }
-
-          final int totalLimit = rows.fold<int>(
-            0,
-            (int sum, BudgetProgress row) => sum + row.limit,
-          );
-          final int totalSpent = rows.fold<int>(
-            0,
-            (int sum, BudgetProgress row) => sum + row.spent,
-          );
-
-          return ListView(
+      body: Column(
+        children: <Widget>[
+          Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
               AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xxl * 4,
+              AppSpacing.sm,
+              AppSpacing.sm,
+              0,
             ),
-            children: <Widget>[
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              children: <Widget>[
+                IconButton(
+                  tooltip: 'Bulan sebelumnya',
+                  onPressed: () => _shiftMonth(-1),
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+                Expanded(
+                  child: Text(
+                    Formatters.monthYear(_month),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Bulan berikutnya',
+                  onPressed: () => _shiftMonth(1),
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: value.when(
+              loading: () => const LoadingState(message: 'Memuat anggaran...'),
+              error: (Object error, StackTrace stack) => ErrorStateView(
+                message: 'Anggaran gagal dimuat.',
+                onRetry: () =>
+                    ref.invalidate(budgetProgressProvider(_month)),
+              ),
+              data: (List<BudgetProgress> rows) {
+                if (rows.isEmpty) {
+                  return Center(
+                    child: SingleChildScrollView(
+                      child: EmptyState(
+                        icon: Icons.pie_chart_outline_rounded,
+                        title: 'Belum ada anggaran',
+                        message:
+                            'Atur batas pengeluaran per kategori untuk '
+                            '${Formatters.monthYear(_month)}.',
+                        action: FilledButton.icon(
+                          onPressed: () => _openForm(),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Tambah anggaran'),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final int totalLimit = rows.fold<int>(
+                  0,
+                  (int sum, BudgetProgress row) => sum + row.limit,
+                );
+                final int totalSpent = rows.fold<int>(
+                  0,
+                  (int sum, BudgetProgress row) => sum + row.spent,
+                );
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.xxl * 4,
+                  ),
                   children: <Widget>[
-                    Text(
-                      'Ringkasan bulan',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'Ringkasan bulan',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          _SummaryRow(label: 'Terpakai', amount: totalSpent),
+                          const SizedBox(height: AppSpacing.xs),
+                          _SummaryRow(label: 'Total batas', amount: totalLimit),
+                          const SizedBox(height: AppSpacing.xs),
+                          _SummaryRow(
+                            label: 'Sisa',
+                            amount: totalLimit - totalSpent,
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    _SummaryRow(label: 'Terpakai', amount: totalSpent),
-                    const SizedBox(height: AppSpacing.xs),
-                    _SummaryRow(label: 'Total batas', amount: totalLimit),
-                    const SizedBox(height: AppSpacing.xs),
-                    _SummaryRow(label: 'Sisa', amount: totalLimit - totalSpent),
+                    for (final BudgetProgress progress in rows) ...<Widget>[
+                      _BudgetCard(
+                        progress: progress,
+                        onEdit: () => _openForm(progress: progress),
+                        onDelete: () => _confirmDelete(progress),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
                   ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              for (final BudgetProgress progress in rows) ...<Widget>[
-                _BudgetCard(
-                  progress: progress,
-                  onEdit: () => _openForm(progress: progress),
-                  onDelete: () => _confirmDelete(progress),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -94,6 +94,15 @@ Widget _buildGateApp({
   );
 }
 
+Future<void> _enterPin(WidgetTester tester, String pin) async {
+  for (final String digit in pin.split('')) {
+    await tester.tap(find.text(digit));
+    await tester.pump();
+  }
+  await tester.tap(find.text('Buka'));
+  await tester.pumpAndSettle();
+}
+
 Future<AppDatabase> _seededDatabase({String? attachmentPath}) async {
   final AppDatabase database = AppDatabase.forTesting();
   await database.customSelect('SELECT 1').get();
@@ -153,11 +162,9 @@ void main() {
 
     expect(find.text('FinTrack terkunci'), findsOneWidget);
     expect(find.text('UNLOCKED_CONTENT'), findsNothing);
-    expect(find.text('Gunakan biometrik'), findsNothing);
+    expect(find.byIcon(Icons.fingerprint_rounded), findsNothing);
 
-    await tester.enterText(find.byType(TextField), '1234');
-    await tester.tap(find.text('Buka'));
-    await tester.pumpAndSettle();
+    await _enterPin(tester, '1234');
 
     expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
     expect(find.text('FinTrack terkunci'), findsNothing);
@@ -175,9 +182,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), '9999');
-    await tester.tap(find.text('Buka'));
-    await tester.pumpAndSettle();
+    await _enterPin(tester, '9999');
 
     expect(find.text('PIN salah.'), findsOneWidget);
     expect(find.text('UNLOCKED_CONTENT'), findsNothing);
@@ -254,9 +259,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '1234');
-    await tester.tap(find.text('Buka'));
-    await tester.pumpAndSettle();
+    await _enterPin(tester, '1234');
     expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -473,4 +476,96 @@ void main() {
       expect(cleanupService.cleanupCalls, 0);
     },
   );
+
+  testWidgets('locking hides routes and open dialogs without tearing them down', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(initialPin: '1234'),
+          ),
+          pinProtectionEnabledProvider.overrideWith((_) async => true),
+          biometricProtectionEnabledProvider.overrideWith((_) async => false),
+        ],
+        child: MaterialApp(
+          builder: (BuildContext context, Widget? child) =>
+              AppLockGate(child: child ?? const SizedBox.shrink()),
+          home: const _RouteStateProbe(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('FinTrack terkunci'), findsOneWidget);
+
+    final ProviderContainer container = ProviderScope.containerOf(
+      tester.element(find.byType(AppLockGate)),
+    );
+    container.read(appLockControllerProvider.notifier).unlock();
+    await tester.pumpAndSettle();
+
+    // Route state is populated before the lock happens.
+    await tester.tap(find.text('Tambah'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nilai: 1'), findsOneWidget);
+
+    await tester.tap(find.text('Buka dialog'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dialog uji'), findsOneWidget);
+
+    container.read(appLockControllerProvider.notifier).lock();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('FinTrack terkunci'), findsOneWidget);
+    // The app content is offstage, so its widgets are not discoverable.
+    expect(find.text('Dialog uji'), findsNothing);
+
+    await _enterPin(tester, '1234');
+
+    expect(tester.takeException(), isNull);
+    // Both the counter state and the still-open dialog survived the lock.
+    expect(find.text('Nilai: 1'), findsOneWidget);
+    expect(find.text('Dialog uji'), findsOneWidget);
+  });
+}
+
+class _RouteStateProbe extends StatefulWidget {
+  const _RouteStateProbe();
+
+  @override
+  State<_RouteStateProbe> createState() => _RouteStateProbeState();
+}
+
+class _RouteStateProbeState extends State<_RouteStateProbe> {
+  int _value = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text('Nilai: $_value'),
+            FilledButton(
+              onPressed: () => setState(() => _value += 1),
+              child: const Text('Tambah'),
+            ),
+            FilledButton(
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (BuildContext context) => const AlertDialog(
+                  title: Text('Dialog uji'),
+                  content: TextField(),
+                ),
+              ),
+              child: const Text('Buka dialog'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

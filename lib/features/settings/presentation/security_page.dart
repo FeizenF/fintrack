@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/database/app_database.dart';
@@ -82,14 +81,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
     }
   }
 
-  Future<bool> _supportsBiometrics() async {
-    try {
-      final LocalAuthentication auth = ref.read(localAuthenticationProvider);
-      return await auth.isDeviceSupported() && await auth.canCheckBiometrics;
-    } on Object {
-      return false;
-    }
-  }
+  Future<bool> _supportsBiometrics() => biometricsAvailable(ref);
 
   Future<void> _setPinEnabled(bool enabled) async {
     if (_busy) return;
@@ -98,7 +90,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
         title: 'Buat PIN aplikasi',
         confirm: true,
       );
-      if (pin == null) return;
+      if (!mounted || pin == null) return;
       final bool saved = await _guard(() async {
         await ref.read(securityRepositoryProvider).setPin(pin);
         try {
@@ -116,7 +108,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
       }
     } else {
       final String? pin = await _askPin(title: 'Masukkan PIN saat ini');
-      if (pin == null) return;
+      if (!mounted || pin == null) return;
       final bool saved = await _guard(() async {
         final bool valid = await ref
             .read(securityRepositoryProvider)
@@ -202,79 +194,12 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
     }
   }
 
-  Future<String?> _askPin({required String title, bool confirm = false}) async {
-    final TextEditingController first = TextEditingController();
-    final TextEditingController second = TextEditingController();
-    String? error;
-    final String? result = await showDialog<String>(
+  Future<String?> _askPin({required String title, bool confirm = false}) {
+    return showDialog<String>(
       context: context,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) =>
-            AlertDialog(
-              title: Text(title),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  TextField(
-                    controller: first,
-                    autofocus: true,
-                    obscureText: true,
-                    maxLength: PinHasher.maxPinLength,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'PIN',
-                      counterText: '',
-                      errorText: error,
-                    ),
-                  ),
-                  if (confirm) ...<Widget>[
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: second,
-                      obscureText: true,
-                      maxLength: PinHasher.maxPinLength,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Ulangi PIN',
-                        counterText: '',
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Batal'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final String pin = first.text;
-                    if (!PinHasher.isValidPin(pin)) {
-                      setDialogState(
-                        () => error =
-                            'PIN harus ${PinHasher.minPinLength}–'
-                            '${PinHasher.maxPinLength} digit angka.',
-                      );
-                      return;
-                    }
-                    if (confirm && pin != second.text) {
-                      setDialogState(
-                        () => error = 'Konfirmasi PIN tidak sama.',
-                      );
-                      return;
-                    }
-                    Navigator.pop(dialogContext, pin);
-                  },
-                  child: const Text('Simpan'),
-                ),
-              ],
-            ),
-      ),
+      builder: (BuildContext dialogContext) =>
+          _PinDialog(title: title, confirm: confirm),
     );
-    first.dispose();
-    second.dispose();
-    return result;
   }
 
   void _showMessage(String message, {bool error = false}) {
@@ -434,6 +359,99 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                 ],
               ],
             ),
+    );
+  }
+}
+
+/// Self-contained PIN entry dialog.
+///
+/// The controllers live in this widget so they are only disposed once the
+/// route is really gone. Disposing them right after `showDialog` returned used
+/// to crash while the dialog was still animating out.
+class _PinDialog extends StatefulWidget {
+  const _PinDialog({required this.title, required this.confirm});
+
+  final String title;
+  final bool confirm;
+
+  @override
+  State<_PinDialog> createState() => _PinDialogState();
+}
+
+class _PinDialogState extends State<_PinDialog> {
+  final TextEditingController _first = TextEditingController();
+  final TextEditingController _second = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _second.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String pin = _first.text;
+    if (!PinHasher.isValidPin(pin)) {
+      setState(
+        () => _error =
+            'PIN harus ${PinHasher.minPinLength}–'
+            '${PinHasher.maxPinLength} digit angka.',
+      );
+      return;
+    }
+    if (widget.confirm && pin != _second.text) {
+      setState(() => _error = 'Konfirmasi PIN tidak sama.');
+      return;
+    }
+    Navigator.pop(context, pin);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          TextField(
+            controller: _first,
+            autofocus: true,
+            obscureText: true,
+            maxLength: PinHasher.maxPinLength,
+            keyboardType: TextInputType.number,
+            onSubmitted: (_) {
+              if (!widget.confirm) _submit();
+            },
+            decoration: InputDecoration(
+              labelText: 'PIN',
+              counterText: '',
+              errorText: _error,
+            ),
+          ),
+          if (widget.confirm) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _second,
+              obscureText: true,
+              maxLength: PinHasher.maxPinLength,
+              keyboardType: TextInputType.number,
+              onSubmitted: (_) => _submit(),
+              decoration: const InputDecoration(
+                labelText: 'Ulangi PIN',
+                counterText: '',
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Simpan')),
+      ],
     );
   }
 }

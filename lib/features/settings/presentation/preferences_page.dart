@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
@@ -23,7 +24,9 @@ class PreferencesPage extends ConsumerWidget {
       appBar: AppBar(
         leading: IconButton(
           tooltip: 'Kembali',
-          onPressed: () => context.pop(),
+          onPressed: () => context.canPop()
+              ? context.pop()
+              : context.go(AppRoutes.settings),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: const Text('Preferensi Aplikasi'),

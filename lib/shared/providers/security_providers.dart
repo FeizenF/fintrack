@@ -59,17 +59,46 @@ final FutureProvider<int> autoLockSecondsProvider = FutureProvider<int>((
       : 0;
 });
 
+/// Upper bound for a biometric capability probe.
+///
+/// Platform channels can stall instead of failing (for example when the plugin
+/// is not registered in tests or unsupported platforms). Without a bound the
+/// security settings page stayed on its loading spinner forever.
+const Duration _biometricProbeTimeout = Duration(seconds: 2);
+
+Future<bool> _probeBiometrics(LocalAuthentication auth) async {
+  if (!await auth.isDeviceSupported()) return false;
+  return auth.canCheckBiometrics;
+}
+
+/// Best-effort check for biometric hardware and enrollment.
+///
+/// Never throws and never hangs, so callers can await it while loading a page.
+Future<bool> biometricsAvailable(WidgetRef ref) async {
+  try {
+    final LocalAuthentication auth = ref.read(localAuthenticationProvider);
+    return await _probeBiometrics(auth).timeout(_biometricProbeTimeout);
+  } on Object {
+    return false;
+  }
+}
+
 Future<bool> authenticateWithBiometrics(WidgetRef ref) async {
   if (!await ref.read(biometricProtectionEnabledProvider.future)) {
     return false;
   }
-  final LocalAuthentication auth = ref.read(localAuthenticationProvider);
-  if (!await auth.isDeviceSupported() || !await auth.canCheckBiometrics) {
+  if (!await biometricsAvailable(ref)) {
     return false;
   }
-  return auth.authenticate(
-    localizedReason: 'Autentikasi untuk membuka FinTrack.',
-    biometricOnly: true,
-    persistAcrossBackgrounding: true,
-  );
+  try {
+    return await ref
+        .read(localAuthenticationProvider)
+        .authenticate(
+          localizedReason: 'Autentikasi untuk membuka FinTrack.',
+          biometricOnly: true,
+          persistAcrossBackgrounding: true,
+        );
+  } on Object {
+    return false;
+  }
 }

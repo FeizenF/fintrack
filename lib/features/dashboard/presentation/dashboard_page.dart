@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -343,40 +342,22 @@ class _TotalsCard extends StatelessWidget {
         ),
       ),
       data: (MonthlyTotals value) {
-        final Brightness brightness = Theme.of(context).brightness;
+        final ThemeData theme = Theme.of(context);
+        final Brightness brightness = theme.brightness;
+        final Color incomeColor = AppColors.incomeOf(brightness);
+        final Color expenseColor = AppColors.expenseOf(brightness);
         return AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: _Metric(
-                      label: 'Pemasukan',
-                      value: _amount(value.income, hidden),
-                      color: AppColors.incomeOf(brightness),
-                    ),
-                  ),
-                  Expanded(
-                    child: _Metric(
-                      label: 'Pengeluaran',
-                      value: _amount(value.expense, hidden),
-                      color: AppColors.expenseOf(brightness),
-                    ),
-                  ),
-                  Expanded(
-                    child: _Metric(
-                      label: 'Selisih',
-                      value: _amount(value.net, hidden),
-                      color: value.net < 0
-                          ? AppColors.expenseOf(brightness)
-                          : Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
+              _CashFlowBars(
+                totals: value,
+                hidden: hidden,
+                incomeColor: incomeColor,
+                expenseColor: expenseColor,
               ),
-              const SizedBox(height: AppSpacing.md),
-              _PeriodChart(totals: value, hidden: hidden),
+              const SizedBox(height: AppSpacing.lg),
+              _NetSummary(totals: value, hidden: hidden),
               if (!value.isEmpty) ...<Widget>[
                 const SizedBox(height: AppSpacing.md),
                 const Divider(height: 1),
@@ -391,15 +372,98 @@ class _TotalsCard extends StatelessWidget {
   }
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric({
+/// Labelled horizontal bars for the selected period.
+///
+/// A vertical bar chart without axis labels read as two floating rectangles on
+/// a phone, and three side-by-side figures made the amounts cramped. Each flow
+/// now gets one row: label, amount and a bar scaled to the larger value, which
+/// keeps the income vs expense comparison obvious at compact widths.
+class _CashFlowBars extends StatelessWidget {
+  const _CashFlowBars({
+    required this.totals,
+    required this.hidden,
+    required this.incomeColor,
+    required this.expenseColor,
+  });
+
+  final MonthlyTotals totals;
+  final bool hidden;
+  final Color incomeColor;
+  final Color expenseColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final int maxValue = totals.income > totals.expense
+        ? totals.income
+        : totals.expense;
+    final bool empty = maxValue <= 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _FlowBar(
+          label: 'Pemasukan',
+          amount: _amount(totals.income, hidden),
+          ratio: empty ? 0 : totals.income / maxValue,
+          color: incomeColor,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _FlowBar(
+          label: 'Pengeluaran',
+          amount: _amount(totals.expense, hidden),
+          ratio: empty ? 0 : totals.expense / maxValue,
+          color: expenseColor,
+        ),
+        if (empty) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.insights_outlined,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Belum ada transaksi pada periode ini.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ] else if (!hidden && totals.income > 0) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Pengeluaran '
+            '${(totals.expense / totals.income * 100).round()}% '
+            'dari pemasukan',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: totals.expense > totals.income
+                  ? expenseColor
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _FlowBar extends StatelessWidget {
+  const _FlowBar({
     required this.label,
-    required this.value,
+    required this.amount,
+    required this.ratio,
     required this.color,
   });
 
   final String label;
-  final String value;
+  final String amount;
+  final double ratio;
   final Color color;
 
   @override
@@ -408,22 +472,38 @@ class _Metric extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        Row(
+          children: <Widget>[
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  amount,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: ratio.clamp(0, 1),
+            minHeight: 8,
+            color: color,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
           ),
         ),
       ],
@@ -431,71 +511,88 @@ class _Metric extends StatelessWidget {
   }
 }
 
-/// Two-bar comparison for the selected period. Axis labels are intentionally
-/// omitted: the exact figures are already shown above, and omitting them keeps
-/// the card readable at compact widths.
-class _PeriodChart extends StatelessWidget {
-  const _PeriodChart({required this.totals, required this.hidden});
+/// Full-width net result with an explicit surplus/deficit label so the number
+/// is not mistaken for another category total.
+class _NetSummary extends StatelessWidget {
+  const _NetSummary({required this.totals, required this.hidden});
 
   final MonthlyTotals totals;
   final bool hidden;
 
   @override
   Widget build(BuildContext context) {
-    final Brightness brightness = Theme.of(context).brightness;
-    final double maxValue = <double>[
-      totals.income.toDouble(),
-      totals.expense.toDouble(),
-    ].reduce((double a, double b) => a > b ? a : b);
-    final double maxY = maxValue <= 0 ? 1 : maxValue * 1.2;
+    final ThemeData theme = Theme.of(context);
+    final Brightness brightness = theme.brightness;
+    final bool surplus = totals.net >= 0;
+    final Color color = surplus
+        ? AppColors.incomeOf(brightness)
+        : AppColors.expenseOf(brightness);
 
-    return SizedBox(
-      height: 96,
-      child: BarChart(
-        BarChartData(
-          maxY: maxY,
-          minY: 0,
-          alignment: BarChartAlignment.spaceAround,
-          barTouchData: BarTouchData(enabled: false),
-          gridData: const FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          barGroups: <BarChartGroupData>[
-            BarChartGroupData(
-              x: 0,
-              barRods: <BarChartRodData>[
-                BarChartRodData(
-                  toY: totals.income.toDouble(),
-                  color: AppColors.incomeOf(brightness),
-                  width: 34,
-                  borderRadius: AppBars.topOnly,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: AppRadius.smallAll,
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              surplus
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+              size: 20,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Selisih',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  surplus ? 'Surplus' : 'Defisit',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
-            BarChartGroupData(
-              x: 1,
-              barRods: <BarChartRodData>[
-                BarChartRodData(
-                  toY: totals.expense.toDouble(),
-                  color: AppColors.expenseOf(brightness),
-                  width: 34,
-                  borderRadius: AppBars.topOnly,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                _amount(totals.net.abs(), hidden),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
+              ),
             ),
-          ],
-        ),
-        duration: Duration.zero,
+          ),
+        ],
       ),
     );
   }
-}
-
-/// Rounded top only, so bars sit flat on the baseline.
-abstract final class AppBars {
-  static const BorderRadius topOnly = BorderRadius.vertical(
-    top: Radius.circular(8),
-  );
 }
 
 class _CategoryBreakdown extends StatelessWidget {
