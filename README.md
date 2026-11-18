@@ -80,10 +80,10 @@ test/         # unit, repository, widget tests
 - Backup dapat dienkripsi dengan AES-256-GCM; kunci diturunkan melalui PBKDF2-HMAC-SHA256. Password tidak disimpan. Simpan password secara terpisah: kehilangan password membuat backup terenkripsi tidak dapat dipulihkan.
 - CSV transaksi memakai UTF-8 BOM, CRLF, semua field di-quote, dan prefiks aman terhadap spreadsheet formula injection.
 - PIN opsional 4–8 digit disimpan sebagai salted PBKDF2 hash di `flutter_secure_storage`. Biometrik opsional memakai `local_auth`; auto-lock tersedia saat kembali dari latar belakang. Jika status keamanan lokal gagal dibaca, aplikasi tetap terkunci dan menyediakan retry.
-- Verifikasi: `flutter test --reporter expanded` lulus (178 tes); `flutter analyze --no-pub` tanpa warning/error (4 info lint `prefer_initializing_formals`); `flutter build apk --release` berhasil menghasilkan APK 62.5 MB. Android memakai `FLAG_SECURE` untuk mencegah screenshot dan pratinjau task switcher.
+- Verifikasi: `flutter test --reporter expanded` lulus (179 tes); `flutter analyze --no-pub` tanpa warning/error (4 info lint `prefer_initializing_formals`); `flutter build apk --release` berhasil menghasilkan APK 62.4 MB. Android memakai `FLAG_SECURE` untuk mencegah screenshot dan pratinjau task switcher.
 - Pembatasan percobaan PIN belum diterapkan; PIN minimum 4 digit, jadi jangan anggap app lock sebagai perlindungan terhadap penyerang dengan akses perangkat fisik.
 - Attachment transaksi menyimpan path lokal, bukan isi file. File attachment tidak termasuk backup dan dapat hilang saat pindah perangkat atau instal ulang.
-- Pemulihan PIN menghapus file attachment yang tercatat hanya jika file berada langsung di folder privat `attachments` aplikasi. File di luar folder itu tetap aman; penghapusan file bersifat best-effort. Reset data tetap selesai walau PIN atau attachment gagal dibersihkan, dan aplikasi menampilkan peringatan bila pembersihan lampiran tidak lengkap.
+- Pemulihan PIN menghapus seluruh file reguler di folder privat `attachments` aplikasi; subfolder, link, dan file di luar folder itu tidak disentuh. Jika PIN gagal dihapus, reset dibatalkan tanpa mengubah data lokal. Bila sebagian lampiran gagal dihapus setelah reset, aplikasi menampilkan peringatan.
 
 ## Keamanan dan privasi
 

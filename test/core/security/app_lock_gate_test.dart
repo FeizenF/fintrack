@@ -16,29 +16,17 @@ import 'package:fintrack/shared/providers/database_providers.dart';
 import 'package:fintrack/shared/providers/security_providers.dart';
 
 class _RecordingAttachmentCleanupService extends AttachmentCleanupService {
-  List<String?> deletedPaths = <String?>[];
+  int cleanupCalls = 0;
   bool throwsOnDelete = false;
-  bool retainsFiles = false;
+  List<String> failedPaths = const <String>[];
+  Future<void> Function()? onCleanup;
 
   @override
-  Future<AttachmentCleanupResult> deleteOwnedAttachments(
-    Iterable<String?> paths,
-  ) async {
-    deletedPaths = paths.toList();
+  Future<AttachmentCleanupResult> deleteOwnedAttachments() async {
+    cleanupCalls++;
+    await onCleanup?.call();
     if (throwsOnDelete) throw FileSystemException('cleanup failed');
-    final int pathCount = deletedPaths.whereType<String>().length;
-    if (retainsFiles) {
-      return AttachmentCleanupResult(
-        deletedCount: 0,
-        retainedCount: pathCount,
-        failedPaths: const <String>[],
-      );
-    }
-    return AttachmentCleanupResult(
-      deletedCount: pathCount,
-      retainedCount: 0,
-      failedPaths: const <String>[],
-    );
+    return AttachmentCleanupResult(deletedCount: 0, failedPaths: failedPaths);
   }
 }
 
@@ -104,6 +92,34 @@ Widget _buildGateApp({
       home: AppLockGate(child: child ?? const Text('UNLOCKED_CONTENT')),
     ),
   );
+}
+
+Future<AppDatabase> _seededDatabase({String? attachmentPath}) async {
+  final AppDatabase database = AppDatabase.forTesting();
+  await database.customSelect('SELECT 1').get();
+  await database.ensureSeeded();
+  await database.saveSetting(SettingKeys.pinEnabled, '1');
+  final int categoryId = (await (database.select(
+    database.categories,
+  )..where((row) => row.name.equals('Makanan'))).getSingle()).id;
+  final int accountId = await database
+      .into(database.accounts)
+      .insert(
+        AccountsCompanion.insert(name: 'Dompet', type: AccountType.cash),
+      );
+  await database
+      .into(database.transactions)
+      .insert(
+        TransactionsCompanion.insert(
+          type: TransactionType.expense,
+          accountId: accountId,
+          categoryId: Value<int>(categoryId),
+          amount: 100,
+          transactionDate: DateTime(2026, 1, 1),
+          attachmentPath: Value<String?>(attachmentPath),
+        ),
+      );
+  return database;
 }
 
 void main() {
@@ -255,46 +271,20 @@ void main() {
   testWidgets('malformed PIN record requires confirmed local data reset', (
     WidgetTester tester,
   ) async {
-    final AppDatabase database = AppDatabase.forTesting();
+    final AppDatabase database = await _seededDatabase(
+      attachmentPath: '/private/attachments/receipt.jpg',
+    );
     addTearDown(database.close);
     final _RecordingAttachmentCleanupService cleanupService =
         _RecordingAttachmentCleanupService();
-    const String attachmentPath = '/private/attachments/receipt.jpg';
-
-    await database.customSelect('SELECT 1').get();
-    await database.ensureSeeded();
-    await database.saveSetting(SettingKeys.pinEnabled, '1');
-    final int categoryId = (await (database.select(
-      database.categories,
-    )..where((row) => row.name.equals('Makanan'))).getSingle()).id;
-    final int accountId = await database
-        .into(database.accounts)
-        .insert(
-          AccountsCompanion.insert(name: 'Dompet', type: AccountType.cash),
-        );
-    await database
-        .into(database.transactions)
-        .insert(
-          TransactionsCompanion.insert(
-            type: TransactionType.expense,
-            accountId: accountId,
-            categoryId: Value<int>(categoryId),
-            amount: 100,
-            transactionDate: DateTime(2026, 1, 1),
-            attachmentPath: const Value<String?>(
-              '/private/attachments/receipt.jpg',
-            ),
-          ),
-        );
-    final _FakeSecurityRepository repository = _FakeSecurityRepository(
-      initialPin: 'CORRUPT',
-    );
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWith((_) async => database),
-          securityRepositoryProvider.overrideWithValue(repository),
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(initialPin: 'CORRUPT'),
+          ),
           attachmentCleanupServiceProvider.overrideWithValue(cleanupService),
         ],
         child: const MaterialApp(
@@ -319,54 +309,37 @@ void main() {
     expect(await database.readSetting(SettingKeys.pinEnabled), isNull);
     expect(await database.countRows(database.accounts), 0);
     expect(await database.countRows(database.categories), greaterThan(0));
-    expect(cleanupService.deletedPaths, <String?>[attachmentPath]);
+    expect(cleanupService.cleanupCalls, 1);
+    expect(find.textContaining('lampiran gagal'), findsNothing);
   });
 
-  testWidgets('attachment cleanup failure does not block completed reset', (
+  testWidgets('attachment cleanup runs after local data wipe', (
     WidgetTester tester,
   ) async {
-    final AppDatabase database = AppDatabase.forTesting();
-    addTearDown(database.close);
-    await database.customSelect('SELECT 1').get();
-    await database.ensureSeeded();
-    await database.saveSetting(SettingKeys.pinEnabled, '1');
-    final int categoryId = (await (database.select(
-      database.categories,
-    )..where((row) => row.name.equals('Makanan'))).getSingle()).id;
-    final int accountId = await database
-        .into(database.accounts)
-        .insert(
-          AccountsCompanion.insert(name: 'Dompet', type: AccountType.cash),
-        );
-    await database
-        .into(database.transactions)
-        .insert(
-          TransactionsCompanion.insert(
-            type: TransactionType.expense,
-            accountId: accountId,
-            categoryId: Value<int>(categoryId),
-            amount: 100,
-            transactionDate: DateTime(2026, 1, 1),
-            attachmentPath: const Value<String?>(
-              '/private/attachments/receipt.jpg',
-            ),
-          ),
-        );
-    final _RecordingAttachmentCleanupService cleanupService =
-        _RecordingAttachmentCleanupService()..throwsOnDelete = true;
-    final _FakeSecurityRepository repository = _FakeSecurityRepository(
-      initialPin: 'CORRUPT',
+    final AppDatabase database = await _seededDatabase(
+      attachmentPath: '/private/attachments/receipt.jpg',
     );
+    addTearDown(database.close);
+    int? transactionsDuringCleanup;
+    final _RecordingAttachmentCleanupService cleanupService =
+        _RecordingAttachmentCleanupService()
+          ..onCleanup = () async {
+            transactionsDuringCleanup = await database.countRows(
+              database.transactions,
+            );
+          };
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           appDatabaseProvider.overrideWith((_) async => database),
-          securityRepositoryProvider.overrideWithValue(repository),
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(initialPin: 'CORRUPT'),
+          ),
           attachmentCleanupServiceProvider.overrideWithValue(cleanupService),
         ],
         child: const MaterialApp(
-          home: Scaffold(body: AppLockGate(child: Text('UNLOCKED_CONTENT'))),
+          home: AppLockGate(child: Text('UNLOCKED_CONTENT')),
         ),
       ),
     );
@@ -376,47 +349,18 @@ void main() {
     await tester.tap(find.text('Hapus data dan reset'));
     await tester.pumpAndSettle();
 
-    expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
-    expect(await database.countRows(database.accounts), 0);
-    expect(cleanupService.deletedPaths, <String?>[
-      '/private/attachments/receipt.jpg',
-    ]);
-    expect(
-      find.textContaining('penghapusan lampiran gagal'),
-      findsOneWidget,
-    );
+    expect(transactionsDuringCleanup, 0);
   });
 
-  testWidgets('partial attachment cleanup warns but completes reset', (
+  testWidgets('attachment cleanup failure does not block completed reset', (
     WidgetTester tester,
   ) async {
-    final AppDatabase database = AppDatabase.forTesting();
+    final AppDatabase database = await _seededDatabase(
+      attachmentPath: '/private/attachments/receipt.jpg',
+    );
     addTearDown(database.close);
-    await database.customSelect('SELECT 1').get();
-    await database.ensureSeeded();
-    await database.saveSetting(SettingKeys.pinEnabled, '1');
-    final int categoryId = (await (database.select(
-      database.categories,
-    )..where((row) => row.name.equals('Makanan'))).getSingle()).id;
-    final int accountId = await database
-        .into(database.accounts)
-        .insert(
-          AccountsCompanion.insert(name: 'Dompet', type: AccountType.cash),
-        );
-    await database
-        .into(database.transactions)
-        .insert(
-          TransactionsCompanion.insert(
-            type: TransactionType.expense,
-            accountId: accountId,
-            categoryId: Value<int>(categoryId),
-            amount: 100,
-            transactionDate: DateTime(2026, 1, 1),
-            attachmentPath: const Value<String?>('/outside/receipt.jpg'),
-          ),
-        );
     final _RecordingAttachmentCleanupService cleanupService =
-        _RecordingAttachmentCleanupService()..retainsFiles = true;
+        _RecordingAttachmentCleanupService()..throwsOnDelete = true;
 
     await tester.pumpWidget(
       ProviderScope(
@@ -440,9 +384,48 @@ void main() {
 
     expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
     expect(await database.countRows(database.accounts), 0);
-    expect(cleanupService.deletedPaths, <String?>['/outside/receipt.jpg']);
+    expect(cleanupService.cleanupCalls, 1);
     expect(
-      find.textContaining('Sebagian lampiran tidak dapat dihapus'),
+      find.textContaining('penghapusan lampiran gagal'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('failed attachment deletion warns but completes reset', (
+    WidgetTester tester,
+  ) async {
+    final AppDatabase database = await _seededDatabase(
+      attachmentPath: '/private/attachments/receipt.jpg',
+    );
+    addTearDown(database.close);
+    final _RecordingAttachmentCleanupService cleanupService =
+        _RecordingAttachmentCleanupService()
+          ..failedPaths = const <String>['/private/attachments/receipt.jpg'];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWith((_) async => database),
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(initialPin: 'CORRUPT'),
+          ),
+          attachmentCleanupServiceProvider.overrideWithValue(cleanupService),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: AppLockGate(child: Text('UNLOCKED_CONTENT'))),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pulihkan akses dengan menghapus data lokal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hapus data dan reset'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
+    expect(await database.countRows(database.accounts), 0);
+    expect(
+      find.textContaining('1 lampiran gagal'),
       findsOneWidget,
     );
   });
@@ -450,16 +433,10 @@ void main() {
   testWidgets(
     'PIN removal failure keeps local data intact for recovery retry',
     (WidgetTester tester) async {
-      final AppDatabase database = AppDatabase.forTesting();
+      final AppDatabase database = await _seededDatabase();
       addTearDown(database.close);
-      await database.customSelect('SELECT 1').get();
-      await database.ensureSeeded();
-      await database.saveSetting(SettingKeys.pinEnabled, '1');
-      await database
-          .into(database.accounts)
-          .insert(
-            AccountsCompanion.insert(name: 'Dompet', type: AccountType.cash),
-          );
+      final _RecordingAttachmentCleanupService cleanupService =
+          _RecordingAttachmentCleanupService();
       final _FakeSecurityRepository repository = _FakeSecurityRepository(
         initialPin: 'CORRUPT',
         removePinFails: true,
@@ -470,9 +447,12 @@ void main() {
           overrides: [
             appDatabaseProvider.overrideWith((_) async => database),
             securityRepositoryProvider.overrideWithValue(repository),
+            attachmentCleanupServiceProvider.overrideWithValue(cleanupService),
           ],
           child: const MaterialApp(
-            home: AppLockGate(child: Text('UNLOCKED_CONTENT')),
+            home: Scaffold(
+              body: AppLockGate(child: Text('UNLOCKED_CONTENT')),
+            ),
           ),
         ),
       );
@@ -484,9 +464,13 @@ void main() {
 
       expect(find.text('UNLOCKED_CONTENT'), findsNothing);
       expect(find.textContaining('PIN tidak tersedia'), findsOneWidget);
+      expect(
+        find.text('Reset gagal. Data lokal tidak diubah; coba lagi.'),
+        findsOneWidget,
+      );
       expect(await database.countRows(database.accounts), 1);
       expect(await database.readSetting(SettingKeys.pinEnabled), '1');
-      expect(await database.select(database.accounts).getSingle(), isNotNull);
+      expect(cleanupService.cleanupCalls, 0);
     },
   );
 }

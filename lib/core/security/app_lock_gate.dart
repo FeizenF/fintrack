@@ -31,6 +31,7 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   DateTime? _backgroundedAt;
   bool _biometricRunning = false;
   bool _unlockScheduled = false;
+  bool _resetting = false;
 
   @override
   void initState() {
@@ -129,6 +130,16 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   }
 
   Future<void> _resetMissingPin() async {
+    if (_resetting) return;
+    _resetting = true;
+    try {
+      await _performLocalReset();
+    } finally {
+      _resetting = false;
+    }
+  }
+
+  Future<void> _performLocalReset() async {
     try {
       final bool usableRecord = await ref
           .read(securityRepositoryProvider)
@@ -167,14 +178,6 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     String? cleanupWarning;
     try {
       final AppDatabase database = await ref.read(appDatabaseProvider.future);
-      final List<String?> attachmentPaths =
-          await (database.select(database.transactions)
-                ..where((t) => t.attachmentPath.isNotNull()))
-              .map(
-                (FinancialTransaction transaction) =>
-                    transaction.attachmentPath,
-              )
-              .get();
       await ref.read(securityRepositoryProvider).removePin();
       await database.transaction(() async {
         await database.delete(database.savingsContributions).go();
@@ -189,11 +192,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
       try {
         final AttachmentCleanupResult result = await ref
             .read(attachmentCleanupServiceProvider)
-            .deleteOwnedAttachments(attachmentPaths);
-        if (result.hasIncompleteCleanup) {
+            .deleteOwnedAttachments();
+        if (result.hasFailures) {
           cleanupWarning =
-              'Reset selesai. Sebagian lampiran tidak dapat dihapus '
-              '(${result.retainedCount + result.failedPaths.length} file).';
+              'Reset selesai. ${result.failedPaths.length} lampiran gagal '
+              'dihapus; hapus file tersebut manual dari penyimpanan aplikasi.';
         }
       } on Object {
         cleanupWarning =
@@ -204,6 +207,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
       if (mounted) {
         ref.invalidate(pinRecordExistsProvider);
         ref.invalidate(pinRecordUsableProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reset gagal. Data lokal tidak diubah; coba lagi.'),
+          ),
+        );
       }
       return;
     }

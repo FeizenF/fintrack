@@ -27,86 +27,96 @@ void main() {
     await supportDirectory.delete(recursive: true);
   });
 
-  test('deletes direct files from owned attachment directory only', () async {
-    final File ownedFile = File(p.join(attachmentsDirectory.path, 'owned.jpg'));
+  test('deletes regular files in the owned attachment folder only', () async {
+    final File firstFile = File(p.join(attachmentsDirectory.path, 'first.jpg'));
+    final File secondFile = File(
+      p.join(attachmentsDirectory.path, 'second.jpg'),
+    );
     final File externalFile = File(
       p.join(supportDirectory.path, 'external.jpg'),
     );
     final File nestedFile = File(
       p.join(attachmentsDirectory.path, 'nested', 'nested.jpg'),
     );
-    await ownedFile.writeAsString('owned');
+    await firstFile.writeAsString('first');
+    await secondFile.writeAsString('second');
     await externalFile.writeAsString('external');
     await nestedFile.parent.create();
     await nestedFile.writeAsString('nested');
 
-    final AttachmentCleanupResult result = await service.deleteOwnedAttachments(
-      <String?>[
-        ownedFile.path,
-        externalFile.path,
-        nestedFile.path,
-        externalFile.path,
-        null,
-      ],
-    );
+    final AttachmentCleanupResult result =
+        await service.deleteOwnedAttachments();
 
-    expect(await ownedFile.exists(), isFalse);
+    expect(await firstFile.exists(), isFalse);
+    expect(await secondFile.exists(), isFalse);
     expect(await externalFile.exists(), isTrue);
     expect(await nestedFile.exists(), isTrue);
-    expect(result.deletedCount, 1);
-    expect(result.retainedCount, 2);
+    expect(result.deletedCount, 2);
     expect(result.failedPaths, isEmpty);
-    expect(result.hasIncompleteCleanup, isTrue);
+    expect(result.hasFailures, isFalse);
   });
 
-  test('ignores missing files and reports retained directory paths', () async {
-    final Directory childDirectory = Directory(
-      p.join(attachmentsDirectory.path, 'folder'),
-    );
-    await childDirectory.create();
-
-    final AttachmentCleanupResult result = await service.deleteOwnedAttachments(
-      <String?>[
-        p.join(attachmentsDirectory.path, 'missing.jpg'),
-        childDirectory.path,
-      ],
-    );
-
-    expect(await childDirectory.exists(), isTrue);
-    expect(result.deletedCount, 0);
-    expect(result.retainedCount, 1);
-    expect(result.failedPaths, isEmpty);
-  });
-
-  test('reports every path as retained when attachment folder is absent', () async {
+  test('reports nothing to clean when attachment folder is absent', () async {
     await attachmentsDirectory.delete();
 
-    final AttachmentCleanupResult result = await service.deleteOwnedAttachments(
-      <String?>[
-        p.join(attachmentsDirectory.path, 'one.jpg'),
-        p.join(attachmentsDirectory.path, 'two.jpg'),
-      ],
-    );
+    final AttachmentCleanupResult result =
+        await service.deleteOwnedAttachments();
 
     expect(result.deletedCount, 0);
-    expect(result.retainedCount, 2);
     expect(result.failedPaths, isEmpty);
-    expect(result.hasIncompleteCleanup, isTrue);
+    expect(result.hasFailures, isFalse);
   });
 
-  test('treats relative paths as retained', () async {
-    final File relativeTarget = File(
-      p.join(attachmentsDirectory.path, 'relative.jpg'),
+  test('reports files that cannot be deleted without touching others', () async {
+    final File lockedFile = File(
+      p.join(attachmentsDirectory.path, 'locked.jpg'),
     );
-    await relativeTarget.writeAsString('kept');
-
-    final AttachmentCleanupResult result = await service.deleteOwnedAttachments(
-      <String?>[p.join('attachments', 'relative.jpg')],
+    final File removableFile = File(
+      p.join(attachmentsDirectory.path, 'removable.jpg'),
+    );
+    await lockedFile.writeAsString('locked');
+    await removableFile.writeAsString('removable');
+    service = AttachmentCleanupService(
+      supportDirectoryProvider: () async => supportDirectory,
+      deleteFile: (File file) async {
+        if (p.equals(file.path, lockedFile.path)) {
+          throw const FileSystemException('file is locked');
+        }
+        await file.delete();
+      },
     );
 
-    expect(await relativeTarget.exists(), isTrue);
+    final AttachmentCleanupResult result =
+        await service.deleteOwnedAttachments();
+
+    expect(await lockedFile.exists(), isTrue);
+    expect(await removableFile.exists(), isFalse);
+    expect(result.deletedCount, 1);
+    expect(result.failedPaths, <String>[lockedFile.path]);
+    expect(result.hasFailures, isTrue);
+  });
+
+  test('keeps a directory symlink inside the attachment folder', () async {
+    final Directory outsideDirectory = Directory(
+      p.join(supportDirectory.path, 'outside'),
+    );
+    await outsideDirectory.create();
+    final File outsideFile = File(p.join(outsideDirectory.path, 'keep.jpg'));
+    await outsideFile.writeAsString('keep');
+    final Link link = Link(p.join(attachmentsDirectory.path, 'linked'));
+    try {
+      await link.create(outsideDirectory.path);
+    } on FileSystemException {
+      // Windows requires developer mode or elevation for symlinks; the
+      // directory-skip test already covers non-file entities.
+      return;
+    }
+
+    final AttachmentCleanupResult result =
+        await service.deleteOwnedAttachments();
+
+    expect(await outsideFile.exists(), isTrue);
     expect(result.deletedCount, 0);
-    expect(result.retainedCount, 1);
-    expect(result.hasIncompleteCleanup, isTrue);
+    expect(result.failedPaths, isEmpty);
   });
 }
