@@ -74,6 +74,9 @@ Widget _buildGateApp({
   required bool pinEnabled,
   required bool biometricEnabled,
   bool autoLockFails = false,
+  DeviceAuthenticator? deviceAuth,
+  AppDatabase? database,
+  AttachmentCleanupService? cleanup,
   Widget? child,
 }) {
   return ProviderScope(
@@ -87,6 +90,12 @@ Widget _buildGateApp({
         if (autoLockFails) throw StateError('settings unavailable');
         return 0;
       }),
+      if (deviceAuth != null)
+        deviceAuthenticatorProvider.overrideWithValue(deviceAuth),
+      if (database != null)
+        appDatabaseProvider.overrideWith((_) async => database),
+      if (cleanup != null)
+        attachmentCleanupServiceProvider.overrideWithValue(cleanup),
     ],
     child: MaterialApp(
       home: AppLockGate(child: child ?? const Text('UNLOCKED_CONTENT')),
@@ -94,11 +103,15 @@ Widget _buildGateApp({
   );
 }
 
-Future<void> _enterPin(WidgetTester tester, String pin) async {
+Future<void> _enterDigits(WidgetTester tester, String pin) async {
   for (final String digit in pin.split('')) {
     await tester.tap(find.text(digit));
     await tester.pump();
   }
+}
+
+Future<void> _enterPin(WidgetTester tester, String pin) async {
+  await _enterDigits(tester, pin);
   await tester.tap(find.text('Buka'));
   await tester.pumpAndSettle();
 }
@@ -186,6 +199,166 @@ void main() {
 
     expect(find.text('PIN salah.'), findsOneWidget);
     expect(find.text('UNLOCKED_CONTENT'), findsNothing);
+  });
+
+  testWidgets('forgot PIN sets a replacement PIN after device verification', (
+    WidgetTester tester,
+  ) async {
+    final AppDatabase database = await _seededDatabase();
+    addTearDown(database.close);
+    final _FakeSecurityRepository repository = _FakeSecurityRepository(
+      initialPin: '1234',
+    );
+    int devicePrompts = 0;
+
+    await tester.pumpWidget(
+      _buildGateApp(
+        repository: repository,
+        pinEnabled: true,
+        biometricEnabled: false,
+        database: database,
+        deviceAuth:
+            ({
+              required String localizedReason,
+              required bool biometricOnly,
+            }) async {
+              devicePrompts++;
+              expect(
+                biometricOnly,
+                isFalse,
+                reason: 'device PIN fallback must be allowed',
+              );
+              return true;
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lupa PIN?'));
+    await tester.pumpAndSettle();
+    expect(find.text('Verifikasi dengan kunci perangkat'), findsOneWidget);
+
+    await tester.tap(find.text('Verifikasi dengan kunci perangkat'));
+    await tester.pumpAndSettle();
+    expect(devicePrompts, 1);
+    expect(find.text('Buat PIN baru'), findsOneWidget);
+
+    await _enterDigits(tester, '4321');
+    await tester.tap(find.text('Lanjut'));
+    await tester.pumpAndSettle();
+    await _enterDigits(tester, '4321');
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
+    expect(await repository.verifyPin('4321'), isTrue);
+    expect(await repository.verifyPin('1234'), isFalse);
+    expect(await database.readSetting(SettingKeys.pinEnabled), '1');
+  });
+
+  testWidgets('forgot PIN reports when device verification is rejected', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildGateApp(
+        repository: _FakeSecurityRepository(initialPin: '1234'),
+        pinEnabled: true,
+        biometricEnabled: false,
+        deviceAuth:
+            ({
+              required String localizedReason,
+              required bool biometricOnly,
+            }) async => false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lupa PIN?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi dengan kunci perangkat'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Verifikasi perangkat gagal'), findsOneWidget);
+    expect(find.text('Buat PIN baru'), findsNothing);
+    expect(find.text('UNLOCKED_CONTENT'), findsNothing);
+    expect(find.text('FinTrack terkunci'), findsNothing);
+  });
+
+  testWidgets('new PIN confirmation must match', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      _buildGateApp(
+        repository: _FakeSecurityRepository(initialPin: '1234'),
+        pinEnabled: true,
+        biometricEnabled: false,
+        deviceAuth:
+            ({
+              required String localizedReason,
+              required bool biometricOnly,
+            }) async => true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Lupa PIN?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi dengan kunci perangkat'));
+    await tester.pumpAndSettle();
+
+    await _enterDigits(tester, '4321');
+    await tester.tap(find.text('Lanjut'));
+    await tester.pumpAndSettle();
+    await _enterDigits(tester, '1111');
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PIN tidak sama. Ulangi dari awal.'), findsOneWidget);
+    expect(find.text('Buat PIN baru'), findsOneWidget);
+    expect(find.text('UNLOCKED_CONTENT'), findsNothing);
+  });
+
+  testWidgets('forgot PIN can still wipe local data', (
+    WidgetTester tester,
+  ) async {
+    final AppDatabase database = await _seededDatabase(
+      attachmentPath: '/private/attachments/receipt.jpg',
+    );
+    addTearDown(database.close);
+    final _RecordingAttachmentCleanupService cleanupService =
+        _RecordingAttachmentCleanupService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWith((_) async => database),
+          securityRepositoryProvider.overrideWithValue(
+            _FakeSecurityRepository(initialPin: '1234'),
+          ),
+          attachmentCleanupServiceProvider.overrideWithValue(cleanupService),
+          deviceAuthenticatorProvider.overrideWithValue(
+            ({
+              required String localizedReason,
+              required bool biometricOnly,
+            }) async => false,
+          ),
+        ],
+        child: const MaterialApp(
+          home: AppLockGate(child: Text('UNLOCKED_CONTENT')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lupa PIN?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hapus semua data lokal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Atur ulang kunci aplikasi?'), findsOneWidget);
+
+    await tester.tap(find.text('Hapus data dan reset'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('UNLOCKED_CONTENT'), findsOneWidget);
+    expect(await database.countRows(database.accounts), 0);
+    expect(cleanupService.cleanupCalls, 1);
   });
 
   testWidgets('AppLockGate fails closed when PIN setting cannot load', (

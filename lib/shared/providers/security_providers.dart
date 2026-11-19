@@ -12,6 +12,29 @@ final Provider<SecurityRepository> securityRepositoryProvider =
 final Provider<LocalAuthentication> localAuthenticationProvider =
     Provider<LocalAuthentication>((Ref ref) => LocalAuthentication());
 
+/// Platform screen-lock prompt, injectable so tests can emulate the OS dialog.
+///
+/// With `biometricOnly: false` Android and iOS also accept the device PIN,
+/// pattern or password, which is what the "lupa PIN" flow relies on.
+typedef DeviceAuthenticator =
+    Future<bool> Function({
+      required String localizedReason,
+      required bool biometricOnly,
+    });
+
+final Provider<DeviceAuthenticator> deviceAuthenticatorProvider =
+    Provider<DeviceAuthenticator>((Ref ref) {
+      final LocalAuthentication auth = ref.watch(localAuthenticationProvider);
+      return ({
+        required String localizedReason,
+        required bool biometricOnly,
+      }) => auth.authenticate(
+        localizedReason: localizedReason,
+        biometricOnly: biometricOnly,
+        persistAcrossBackgrounding: true,
+      );
+    });
+
 /// Whether any non-empty PIN record exists in platform secure storage.
 final FutureProvider<bool> pinRecordExistsProvider = FutureProvider<bool>(
   (Ref ref) => ref.watch(securityRepositoryProvider).hasPinRecord,
@@ -98,6 +121,22 @@ Future<bool> authenticateWithBiometrics(WidgetRef ref) async {
           biometricOnly: true,
           persistAcrossBackgrounding: true,
         );
+  } on Object {
+    return false;
+  }
+}
+
+/// Verifies the device owner with the platform screen lock.
+///
+/// Used by the "lupa PIN" flow. Passing `biometricOnly: false` also accepts the
+/// device PIN, pattern or password, so a forgotten app PIN can be replaced
+/// without deleting the ledger. Never throws and never hangs.
+Future<bool> authenticateWithDeviceCredentials(WidgetRef ref) async {
+  try {
+    return await ref.read(deviceAuthenticatorProvider)(
+      localizedReason: 'Verifikasi perangkat untuk membuat PIN baru FinTrack.',
+      biometricOnly: false,
+    );
   } on Object {
     return false;
   }
