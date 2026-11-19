@@ -9,6 +9,7 @@ import '../../../core/database/repositories/transactions_repository.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -73,13 +74,11 @@ class TransactionDetailPage extends ConsumerWidget {
             title: const Text('Hapus transaksi?'),
             content: const Text('Tindakan ini tidak dapat dibatalkan.'),
             actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Hapus'),
+              DialogActions(
+                onCancel: () => Navigator.pop(context, false),
+                onConfirm: () => Navigator.pop(context, true),
+                confirmLabel: 'Hapus',
+                destructive: true,
               ),
             ],
           ),

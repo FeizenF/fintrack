@@ -15,6 +15,7 @@ import '../../../core/utils/backup_codec.dart';
 import '../../../core/utils/csv_exporter.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../shared/providers/backup_providers.dart';
 import '../../../shared/providers/database_providers.dart';
 
@@ -210,13 +211,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           '${document.totalRows} baris. Semua data aplikasi saat ini akan diganti.',
         ),
         actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Pulihkan'),
+          DialogActions(
+            onCancel: () => Navigator.pop(context, false),
+            onConfirm: () => Navigator.pop(context, true),
+            confirmLabel: 'Pulihkan',
           ),
         ],
       ),

@@ -8,6 +8,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
@@ -156,13 +157,11 @@ class SavingsPage extends ConsumerWidget {
               'memiliki setoran. Target dengan riwayat dapat diarsipkan.',
             ),
             actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Hapus'),
+              DialogActions(
+                onCancel: () => Navigator.pop(context, false),
+                onConfirm: () => Navigator.pop(context, true),
+                confirmLabel: 'Hapus',
+                destructive: true,
               ),
             ],
           ),
@@ -425,13 +424,10 @@ class _GoalFormDialogState extends ConsumerState<_GoalFormDialog> {
       ),
     ),
     actions: <Widget>[
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context, false),
-        child: const Text('Batal'),
-      ),
-      FilledButton(
-        onPressed: _saving ? null : _save,
-        child: Text(_saving ? 'Menyimpan...' : 'Simpan'),
+      DialogActions(
+        onCancel: _saving ? null : () => Navigator.pop(context, false),
+        onConfirm: _saving ? null : _save,
+        confirmLabel: _saving ? 'Menyimpan...' : 'Simpan',
       ),
     ],
   );
@@ -578,17 +574,12 @@ class _ContributionDialogState extends ConsumerState<_ContributionDialog> {
         ),
       ),
       actions: <Widget>[
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.pop(context, false),
-          child: const Text('Batal'),
-        ),
-        FilledButton(
-          onPressed: _saving || selected == null ? null : _save,
-          child: Text(
-            _saving
-                ? 'Menyimpan...'
-                : 'Simpan ${deposit ? 'setoran' : 'penarikan'}',
-          ),
+        DialogActions(
+          onCancel: _saving ? null : () => Navigator.pop(context, false),
+          onConfirm: _saving || selected == null ? null : _save,
+          confirmLabel: _saving
+              ? 'Menyimpan...'
+              : 'Simpan ${deposit ? 'setoran' : 'penarikan'}',
         ),
       ],
     );

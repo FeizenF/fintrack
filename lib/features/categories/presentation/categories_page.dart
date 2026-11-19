@@ -6,6 +6,7 @@ import '../../../core/database/enums.dart';
 import '../../../core/database/repositories/categories_repository.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
@@ -106,13 +107,11 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage>
                 title: const Text('Hapus kategori?'),
                 content: Text('Kategori "${category.name}" akan dihapus.'),
                 actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Batal'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Hapus'),
+                  DialogActions(
+                    onCancel: () => Navigator.pop(context, false),
+                    onConfirm: () => Navigator.pop(context, true),
+                    confirmLabel: 'Hapus',
+                    destructive: true,
                   ),
                 ],
               ),
@@ -260,13 +259,10 @@ class _CategoryFormDialogState extends ConsumerState<_CategoryFormDialog> {
       decoration: const InputDecoration(labelText: 'Nama kategori'),
     ),
     actions: <Widget>[
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context, false),
-        child: const Text('Batal'),
-      ),
-      FilledButton(
-        onPressed: _saving ? null : _save,
-        child: Text(_saving ? 'Menyimpan...' : 'Simpan'),
+      DialogActions(
+        onCancel: _saving ? null : () => Navigator.pop(context, false),
+        onConfirm: _saving ? null : _save,
+        confirmLabel: _saving ? 'Menyimpan...' : 'Simpan',
       ),
     ],
   );

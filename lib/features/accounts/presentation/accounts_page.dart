@@ -8,6 +8,7 @@ import '../../../core/database/repositories/accounts_repository.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
@@ -200,13 +201,11 @@ class AccountsPage extends ConsumerWidget {
             title: const Text('Hapus akun?'),
             content: Text('Akun "${account.name}" akan dihapus permanen.'),
             actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Hapus'),
+              DialogActions(
+                onCancel: () => Navigator.pop(context, false),
+                onConfirm: () => Navigator.pop(context, true),
+                confirmLabel: 'Hapus',
+                destructive: true,
               ),
             ],
           ),
@@ -317,13 +316,10 @@ class _AccountFormDialogState extends ConsumerState<_AccountFormDialog> {
       ),
     ),
     actions: <Widget>[
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context, false),
-        child: const Text('Batal'),
-      ),
-      FilledButton(
-        onPressed: _saving ? null : _save,
-        child: Text(_saving ? 'Menyimpan...' : 'Simpan'),
+      DialogActions(
+        onCancel: _saving ? null : () => Navigator.pop(context, false),
+        onConfirm: _saving ? null : _save,
+        confirmLabel: _saving ? 'Menyimpan...' : 'Simpan',
       ),
     ],
   );

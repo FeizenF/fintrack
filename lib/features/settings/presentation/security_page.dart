@@ -6,6 +6,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/security/pin_hasher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/dialog_actions.dart';
 import '../../../shared/providers/app_lock_provider.dart';
 import '../../../shared/providers/database_providers.dart';
 import '../../../shared/providers/security_providers.dart';
@@ -288,6 +289,30 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                               : 'Perangkat tidak mendukung biometrik',
                         ),
                       ),
+                      if (_pinEnabled) ...<Widget>[
+                        const Divider(height: AppSpacing.xl),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Icon(
+                              Icons.help_outline_rounded,
+                              size: 18,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                'Lupa PIN? Di layar kunci pilih "Lupa PIN?", '
+                                'lalu verifikasi kunci perangkat untuk membuat '
+                                'PIN baru tanpa menghapus data.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -449,11 +474,11 @@ class _PinDialogState extends State<_PinDialog> {
         ],
       ),
       actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Batal'),
+        DialogActions(
+          onCancel: () => Navigator.pop(context),
+          onConfirm: _submit,
+          confirmLabel: 'Simpan',
         ),
-        FilledButton(onPressed: _submit, child: const Text('Simpan')),
       ],
     );
   }

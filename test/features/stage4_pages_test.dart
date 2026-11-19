@@ -166,6 +166,19 @@ void main() {
 
     await tester.tap(find.byTooltip('Tambah anggaran'));
     await tester.pumpAndSettle();
+
+    // Cancel and confirm share one row and one height. The theme's full-width
+    // filled-button minimum used to push "Batal" onto its own line.
+    final Rect cancel = tester.getRect(
+      find.widgetWithText(TextButton, 'Batal'),
+    );
+    final Rect confirm = tester.getRect(
+      find.widgetWithText(FilledButton, 'Simpan'),
+    );
+    expect(cancel.center.dy, closeTo(confirm.center.dy, 0.5));
+    expect(cancel.height, closeTo(confirm.height, 0.5));
+    expect(cancel.right, lessThan(confirm.left));
+
     await tester.enterText(find.byType(TextFormField), '250000');
     await tester.tap(find.widgetWithText(FilledButton, 'Simpan'));
     await tester.pumpAndSettle();
