@@ -8,6 +8,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
@@ -225,10 +226,7 @@ class _GoalCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: Text(
-                  progress.goal.name,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                child: SectionTitle(progress.goal.name),
               ),
               PopupMenuButton<String>(
                 tooltip: 'Aksi target ${progress.goal.name}',

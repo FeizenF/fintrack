@@ -15,6 +15,7 @@ import '../../../core/utils/backup_codec.dart';
 import '../../../core/utils/csv_exporter.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/dialog_actions.dart';
 import '../../../shared/providers/backup_providers.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -333,7 +334,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   size: 30,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text('Salinan data lokal', style: theme.textTheme.titleLarge),
+                const SectionTitle('Salinan data lokal'),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Backup mencakup akun, kategori, transaksi, anggaran, target tabungan, kontribusi, dan preferensi non-keamanan. PIN, biometrik, serta jeda kunci perangkat tetap lokal dan tidak ikut diekspor.',
@@ -395,7 +396,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   size: 30,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text('Ekspor transaksi', style: theme.textTheme.titleLarge),
+                const SectionTitle('Ekspor transaksi'),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'CSV UTF-8 untuk spreadsheet. Nilai Rupiah tetap bilangan bulat.',

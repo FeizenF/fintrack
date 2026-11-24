@@ -8,6 +8,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
@@ -133,10 +134,7 @@ class _BudgetsPageState extends ConsumerState<BudgetsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            'Ringkasan bulan',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          const SectionTitle('Ringkasan bulan'),
                           const SizedBox(height: AppSpacing.md),
                           _SummaryRow(label: 'Terpakai', amount: totalSpent),
                           const SizedBox(height: AppSpacing.xs),
@@ -270,10 +268,7 @@ class _BudgetCard extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: Text(
-                  progress.categoryName,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                child: SectionTitle(progress.categoryName),
               ),
               Text(
                 Formatters.percent(progress.ratio * 100),

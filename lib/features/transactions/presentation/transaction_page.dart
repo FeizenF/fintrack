@@ -11,6 +11,7 @@ import '../../../core/utils/transaction_groups.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/tab_page_header.dart';
 import '../../../shared/providers/database_providers.dart';
 
@@ -309,11 +310,8 @@ class _GroupHeader extends StatelessWidget {
                 Row(
                   children: <Widget>[
                     Expanded(
-                      child: Text(
+                      child: SectionTitle(
                         transactionGroupLabel(group, grouping),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
                       ),
                     ),
                     Text(

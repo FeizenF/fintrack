@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_range.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/cash_flow_summary.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
@@ -408,7 +409,7 @@ class _CategoryBreakdown extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('Pengeluaran per kategori', style: theme.textTheme.titleSmall),
+            const SectionTitle('Pengeluaran per kategori'),
             const SizedBox(height: AppSpacing.sm),
             for (final CategoryAmount row in top)
               Padding(

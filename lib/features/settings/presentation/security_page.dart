@@ -6,6 +6,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/security/pin_hasher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/section_title.dart';
 import '../../../core/widgets/dialog_actions.dart';
 import '../../../shared/providers/app_lock_provider.dart';
 import '../../../shared/providers/database_providers.dart';
@@ -257,7 +258,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text('Kunci aplikasi', style: theme.textTheme.titleLarge),
+                      const SectionTitle('Kunci aplikasi'),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'PIN disimpan sebagai hash di penyimpanan aman perangkat '
@@ -321,7 +322,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text('Kunci otomatis', style: theme.textTheme.titleLarge),
+                      const SectionTitle('Kunci otomatis'),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         _pinEnabled
