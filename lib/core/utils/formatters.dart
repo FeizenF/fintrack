@@ -72,6 +72,9 @@ abstract final class Formatters {
 
   static String monthYear(DateTime date) => _date('MMMM yyyy').format(date);
 
+  /// `2026`
+  static String year(DateTime date) => _date('yyyy').format(date);
+
   static String shortDateTime(DateTime date) =>
       _date('d MMM yyyy, HH:mm').format(date);
 

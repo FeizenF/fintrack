@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/enums.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/transaction_groups.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
@@ -23,6 +24,8 @@ class TransactionsPage extends ConsumerStatefulWidget {
 class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   TransactionType? _filter;
   int? _accountFilter;
+  TransactionGrouping _grouping = TransactionGrouping.month;
+  final Set<String> _collapsed = <String>{};
   final TextEditingController _search = TextEditingController();
   String _query = '';
 
@@ -30,6 +33,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  void _toggleGroup(String key) {
+    setState(() {
+      if (!_collapsed.remove(key)) _collapsed.add(key);
+    });
   }
 
   @override
@@ -118,6 +127,17 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   ),
               ],
             ),
+          _ChipRow(
+            children: <Widget>[
+              for (final TransactionGrouping grouping
+                  in TransactionGrouping.values)
+                _FilterChip(
+                  label: 'Per ${grouping.label.toLowerCase()}',
+                  selected: _grouping == grouping,
+                  onTap: () => setState(() => _grouping = grouping),
+                ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           Expanded(
             child: value.when(
@@ -168,31 +188,220 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                         : null,
                   );
                 }
-                return ListView.separated(
+                final List<TransactionGroup> groups = groupTransactions(
+                  filtered,
+                  _grouping,
+                );
+                // While searching, keep every group open so no match can hide
+                // behind a collapsed header.
+                final bool forceOpen = _query.isNotEmpty;
+                return ListView(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.lg,
                     AppSpacing.sm,
                     AppSpacing.lg,
                     AppSpacing.xxl * 4,
                   ),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (BuildContext context, int index) =>
-                      _TransactionTile(
-                        transaction: filtered[index],
-                        accountName:
-                            accountNames[filtered[index].accountId] ?? 'Akun',
-                        destinationName:
-                            accountNames[filtered[index].toAccountId] ??
-                            'Akun tujuan',
+                  children: <Widget>[
+                    for (final TransactionGroup group in groups)
+                      _GroupSection(
+                        group: group,
+                        grouping: _grouping,
+                        collapsed:
+                            !forceOpen && _collapsed.contains(group.key),
+                        onToggle: () => _toggleGroup(group.key),
+                        accountNames: accountNames,
                       ),
+                  ],
                 );
               },
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One bucket header plus its transaction cards.
+class _GroupSection extends StatelessWidget {
+  const _GroupSection({
+    required this.group,
+    required this.grouping,
+    required this.collapsed,
+    required this.onToggle,
+    required this.accountNames,
+  });
+
+  final TransactionGroup group;
+  final TransactionGrouping grouping;
+  final bool collapsed;
+  final VoidCallback onToggle;
+  final Map<int, String> accountNames;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _GroupHeader(
+          group: group,
+          grouping: grouping,
+          collapsed: collapsed,
+          onToggle: onToggle,
+        ),
+        if (!collapsed)
+          for (final FinancialTransaction row in group.rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _TransactionTile(
+                transaction: row,
+                accountName: accountNames[row.accountId] ?? 'Akun',
+                destinationName:
+                    accountNames[row.toAccountId] ?? 'Akun tujuan',
+              ),
+            ),
+        const SizedBox(height: AppSpacing.md),
+      ],
+    );
+  }
+}
+
+/// Sticky-looking header showing the bucket label and its totals.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({
+    required this.group,
+    required this.grouping,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final TransactionGroup group;
+  final TransactionGrouping grouping;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final Brightness brightness = theme.brightness;
+    final Color incomeColor = AppColors.incomeOf(brightness);
+    final Color expenseColor = AppColors.expenseOf(brightness);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.55,
+        ),
+        borderRadius: AppRadius.smallAll,
+        child: InkWell(
+          onTap: onToggle,
+          borderRadius: AppRadius.smallAll,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        transactionGroupLabel(group, grouping),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${group.count} transaksi',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    AnimatedRotation(
+                      turns: collapsed ? 0 : 0.5,
+                      duration: const Duration(milliseconds: 160),
+                      child: Icon(
+                        Icons.expand_more_rounded,
+                        size: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.xs,
+                  children: <Widget>[
+                    _TotalChip(
+                      icon: Icons.south_west_rounded,
+                      label: Formatters.currency(group.income),
+                      color: incomeColor,
+                    ),
+                    _TotalChip(
+                      icon: Icons.north_east_rounded,
+                      label: Formatters.currency(group.expense),
+                      color: expenseColor,
+                    ),
+                    if (group.transfer > 0)
+                      _TotalChip(
+                        icon: Icons.swap_horiz_rounded,
+                        label: Formatters.currency(group.transfer),
+                        color: theme.colorScheme.primary,
+                      ),
+                    _TotalChip(
+                      icon: group.net >= 0
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_down_rounded,
+                      label: '${group.net >= 0 ? '+' : '−'}'
+                          '${Formatters.currency(group.net.abs())}',
+                      color: group.net >= 0
+                          ? theme.colorScheme.primary
+                          : expenseColor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TotalChip extends StatelessWidget {
+  const _TotalChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
