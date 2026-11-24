@@ -107,6 +107,8 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     if (backgroundedAt == null || !mounted) return;
     final bool unlocked = ref.read(appLockControllerProvider);
     if (!unlocked) return;
+    // An unreadable preference fails closed (lock now) instead of silently
+    // extending the unlocked window; only a valid stored value can be relaxed.
     int delaySeconds = 0;
     try {
       delaySeconds = await ref.read(autoLockSecondsProvider.future);

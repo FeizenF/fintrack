@@ -77,9 +77,12 @@ final FutureProvider<int> autoLockSecondsProvider = FutureProvider<int>((
   final int? configured = int.tryParse(
     await database.readSetting(SettingKeys.autoLockSeconds) ?? '',
   );
+  // A stored 0 (or any value no longer offered) falls back to the 10 second
+  // floor instead of "lock immediately", which is what made the app demand a
+  // PIN after a two-second glance at another app.
   return AppConstants.autoLockDelaysSeconds.contains(configured)
       ? configured!
-      : 0;
+      : AppConstants.autoLockDefaultSeconds;
 });
 
 /// Upper bound for a biometric capability probe.

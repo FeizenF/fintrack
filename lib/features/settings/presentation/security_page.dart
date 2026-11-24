@@ -29,7 +29,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   bool _pinEnabled = false;
   bool _biometricEnabled = false;
   bool _biometricAvailable = false;
-  int _autoLockSeconds = 0;
+  int _autoLockSeconds = AppConstants.autoLockDefaultSeconds;
 
   @override
   void initState() {
@@ -67,7 +67,7 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
         _autoLockSeconds =
             AppConstants.autoLockDelaysSeconds.contains(configuredDelay)
             ? configuredDelay!
-            : 0;
+            : AppConstants.autoLockDefaultSeconds;
         _loadError = false;
         _loading = false;
       });
@@ -215,9 +215,9 @@ class _SecurityPageState extends ConsumerState<SecurityPage> {
   }
 
   String _delayLabel(int seconds) {
-    if (seconds == 0) return 'Segera setelah keluar';
     if (seconds < 60) return 'Setelah $seconds detik';
-    return 'Setelah ${seconds ~/ 60} menit';
+    if (seconds < 3600) return 'Setelah ${seconds ~/ 60} menit';
+    return 'Setelah ${seconds ~/ 3600} jam';
   }
 
   @override
