@@ -16,12 +16,15 @@ abstract final class AppRoutes {
   static const String backup = '/backup';
   static const String security = '/security';
   static const String preferences = '/preferences';
+  static const String shopping = '/shopping';
 
   /// Router path patterns (used by go_router route definitions).
   static const String transactionDetailPattern = '/transactions/:id';
   static const String transactionEditPattern = '/transactions/:id/edit';
+  static const String shoppingDetailPattern = '/shopping/:id';
 
   /// Concrete navigation targets.
   static String transactionDetail(int id) => '/transactions/$id';
   static String transactionEdit(int id) => '/transactions/$id/edit';
+  static String shoppingDetail(int id) => '/shopping/$id';
 }

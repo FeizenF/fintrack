@@ -13,6 +13,7 @@ import '../../core/database/repositories/categories_repository.dart';
 import '../../core/database/repositories/transactions_repository.dart';
 import '../../core/database/repositories/budgets_repository.dart';
 import '../../core/database/repositories/savings_repository.dart';
+import '../../core/database/repositories/shopping_repository.dart';
 import '../../core/database/repositories/summary_repository.dart';
 
 final FutureProvider<AppDatabase> appDatabaseProvider =
@@ -53,6 +54,12 @@ final FutureProvider<SavingsRepository> savingsRepositoryProvider =
     FutureProvider<SavingsRepository>(
       (Ref ref) async =>
           SavingsRepository(await ref.watch(appDatabaseProvider.future)),
+    );
+
+final FutureProvider<ShoppingRepository> shoppingRepositoryProvider =
+    FutureProvider<ShoppingRepository>(
+      (Ref ref) async =>
+          ShoppingRepository(await ref.watch(appDatabaseProvider.future)),
     );
 
 final FutureProvider<SummaryRepository> summaryRepositoryProvider =
@@ -283,6 +290,24 @@ final expenseByCategoryRangeProvider =
         summaryRepositoryProvider.future,
       );
       yield* repository.watchExpenseByCategoryInRange(range);
+    });
+
+/// Live shopping notes (catatan belanja) with their totals.
+final StreamProvider<List<ShoppingListDetail>> shoppingListsProvider =
+    StreamProvider<List<ShoppingListDetail>>((Ref ref) async* {
+      final ShoppingRepository repository = await ref.watch(
+        shoppingRepositoryProvider.future,
+      );
+      yield* repository.watch();
+    });
+
+/// Live single shopping note, used by its detail page.
+final shoppingListProvider =
+    StreamProvider.family<ShoppingListDetail?, int>((Ref ref, int id) async* {
+      final ShoppingRepository repository = await ref.watch(
+        shoppingRepositoryProvider.future,
+      );
+      yield* repository.watchOne(id);
     });
 
 /// Newest transactions for the dashboard preview.

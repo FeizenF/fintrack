@@ -12,6 +12,8 @@ import '../../features/savings/presentation/savings_page.dart';
 import '../../features/settings/presentation/preferences_page.dart';
 import '../../features/settings/presentation/security_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/shopping/presentation/shopping_detail_page.dart';
+import '../../features/shopping/presentation/shopping_page.dart';
 import '../../features/transactions/presentation/transaction_form_page.dart';
 import '../../features/transactions/presentation/transaction_page.dart';
 import '../../features/transactions/presentation/transaction_detail_page.dart';
@@ -117,6 +119,18 @@ GoRouter createRouter() => GoRouter(
     GoRoute(
       path: AppRoutes.preferences,
       builder: (context, state) => const PreferencesPage(),
+    ),
+    GoRoute(
+      path: AppRoutes.shopping,
+      builder: (context, state) => const ShoppingPage(),
+      routes: <RouteBase>[
+        GoRoute(
+          path: ':id',
+          builder: (context, state) => ShoppingDetailPage(
+            listId: int.parse(state.pathParameters['id']!),
+          ),
+        ),
+      ],
     ),
   ],
 );

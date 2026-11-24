@@ -81,6 +81,31 @@ class ShoppingRepository {
     return _detailOf(list);
   }
 
+  /// Live single note, re-emitted whenever the note or one of its lines changes.
+  Stream<ShoppingListDetail?> watchOne(int id) async* {
+    // `readsFrom` includes shopping_items, so ticking a line re-emits the note
+    // even though the watched SQL only touches shopping_lists.
+    final Stream<List<QueryRow>> rows = _db
+        .customSelect(
+          'SELECT * FROM shopping_lists WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(id)],
+          readsFrom: <TableInfo<Table, Object?>>{
+            _db.shoppingLists,
+            _db.shoppingItems,
+          },
+        )
+        .watch();
+
+    await for (final List<QueryRow> batch in rows) {
+      if (batch.isEmpty) {
+        yield null;
+        continue;
+      }
+      final ShoppingList list = _db.shoppingLists.map(batch.single.data);
+      yield await _detailOf(list);
+    }
+  }
+
   Future<int> create({
     required String title,
     required DateTime shoppingDate,
