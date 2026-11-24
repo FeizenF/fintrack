@@ -76,7 +76,7 @@ class BackupService {
   }) async {
     if (!confirmed) throw StateError('Pemulihan belum dikonfirmasi.');
     // Re-encode/decode to make sure caller cannot construct a forged document.
-    if (document.schemaVersion != AppConstants.backupSchemaVersion) {
+    if (document.schemaVersion > AppConstants.backupSchemaVersion) {
       throw FormatException(
         'Versi backup ${document.schemaVersion} tidak didukung aplikasi ini.',
       );
@@ -142,6 +142,8 @@ class BackupService {
     'budgets' => _database.budgets,
     'savings_goals' => _database.savingsGoals,
     'savings_contributions' => _database.savingsContributions,
+    'shopping_lists' => _database.shoppingLists,
+    'shopping_items' => _database.shoppingItems,
     'app_settings' => _database.appSettings,
     _ => throw StateError('Unexpected backup table: $name'),
   };

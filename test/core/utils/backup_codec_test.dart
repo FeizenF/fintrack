@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fintrack/core/constants/app_constants.dart';
 import 'package:fintrack/core/utils/backup_codec.dart';
 
 void main() {
@@ -22,14 +23,13 @@ void main() {
       );
 
       final BackupDocument document = codec.decode(json);
-      expect(document.schemaVersion, 1);
+      expect(document.schemaVersion, AppConstants.backupSchemaVersion);
       expect(document.createdAt, DateTime.utc(2026, 11, 18));
       expect(document.tables.keys, containsAll(BackupCodec.tableNames));
       expect(document.tables['accounts']!.single['id'], 1);
     });
 
-    test('rejects unsupported schema version', () {
-      final String json = jsonEncode(<String, Object?>{
+    test('rejects unsupported schema version', () {      final String json = jsonEncode(<String, Object?>{
         'format': BackupCodec.formatName,
         'schemaVersion': 999,
         'createdAt': '2026-11-18T00:00:00.000Z',
@@ -41,10 +41,28 @@ void main() {
       expect(() => codec.decode(json), throwsA(isA<FormatException>()));
     });
 
+    test('accepts an older schema 1 backup without shopping tables', () {
+      final String json = jsonEncode(<String, Object?>{
+        'format': BackupCodec.formatName,
+        'schemaVersion': 1,
+        'createdAt': '2026-11-18T00:00:00.000Z',
+        'tables': <String, Object?>{
+          for (final String table in BackupCodec.tableNames)
+            if (table != 'shopping_lists' && table != 'shopping_items')
+              table: <Object?>[],
+        },
+      });
+
+      final BackupDocument document = codec.decode(json);
+      expect(document.tables['shopping_lists'], isEmpty);
+      expect(document.tables['shopping_items'], isEmpty);
+      expect(document.tables['accounts'], isEmpty);
+    });
+
     test('rejects missing tables and malformed rows', () {
       final String missing = jsonEncode(<String, Object?>{
         'format': BackupCodec.formatName,
-        'schemaVersion': 1,
+        'schemaVersion': AppConstants.backupSchemaVersion,
         'createdAt': '2026-11-18T00:00:00.000Z',
         'tables': <String, Object?>{},
       });

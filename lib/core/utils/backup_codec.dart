@@ -44,11 +44,20 @@ class BackupCodec {
     'budgets',
     'savings_goals',
     'savings_contributions',
+    'shopping_lists',
+    'shopping_items',
     'app_settings',
   ];
 
-  static const int _iterations = 210000;
-  static const int _saltLength = 16;
+  /// Tables added in backup schema 2. A schema 1 file predates them, so a
+  /// missing shopping table is read as "no shopping notes yet" instead of an
+  /// invalid backup.
+  static const List<String> _shoppingTables = <String>[
+    'shopping_lists',
+    'shopping_items',
+  ];
+
+  static const int _iterations = 210000;  static const int _saltLength = 16;
   static const int _nonceLength = 12;
   static const int _tagLength = 16;
   static const int _maxBackupBytes = 20 * 1024 * 1024;
@@ -119,6 +128,25 @@ class BackupCodec {
           'note',
           'created_at',
         ],
+        'shopping_lists': <String>[
+          'id',
+          'title',
+          'note',
+          'shopping_date',
+          'transaction_id',
+          'created_at',
+          'updated_at',
+        ],
+        'shopping_items': <String>[
+          'id',
+          'list_id',
+          'name',
+          'quantity',
+          'unit_price',
+          'is_checked',
+          'sort_order',
+          'created_at',
+        ],
         'app_settings': <String>['key', 'value', 'updated_at'],
       };
 
@@ -162,7 +190,7 @@ class BackupCodec {
     if (version is! int) {
       throw const FormatException('Versi skema backup tidak valid.');
     }
-    if (version != AppConstants.backupSchemaVersion) {
+    if (version < 1 || version > AppConstants.backupSchemaVersion) {
       throw FormatException(
         'Versi backup $version tidak didukung aplikasi ini '
         '(versi ${AppConstants.backupSchemaVersion}).',
@@ -183,6 +211,11 @@ class BackupCodec {
         <String, List<Map<String, Object?>>>{};
     for (final String name in tableNames) {
       final Object? rawRows = rawTables[name];
+      if (rawRows == null && version < 2 && _shoppingTables.contains(name)) {
+        // Shopping notes did not exist in backup schema 1.
+        tables[name] = <Map<String, Object?>>[];
+        continue;
+      }
       if (rawRows is! List<Object?>) {
         throw FormatException('Tabel $name tidak ditemukan atau tidak valid.');
       }

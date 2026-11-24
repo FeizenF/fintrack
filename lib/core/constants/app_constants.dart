@@ -24,5 +24,5 @@ abstract final class AppConstants {
   static const int autoLockDefaultSeconds = 10;
 
   /// Current backup schema version.
-  static const int backupSchemaVersion = 1;
+  static const int backupSchemaVersion = 2;
 }

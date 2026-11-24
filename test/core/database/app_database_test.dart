@@ -45,6 +45,8 @@ void main() {
           'categories',
           'savings_contributions',
           'savings_goals',
+          'shopping_items',
+          'shopping_lists',
           'transactions',
         ]),
       );
@@ -52,7 +54,7 @@ void main() {
 
     test('reports the current schema version', () async {
       expect(db.schemaVersion, appDatabaseSchemaVersion);
-      expect(db.schemaVersion, greaterThanOrEqualTo(3));
+      expect(db.schemaVersion, greaterThanOrEqualTo(4));
     });
 
     test('declares the expected indexes for query performance', () async {
@@ -81,6 +83,8 @@ void main() {
           'idx_savings_goals_active',
           'idx_savings_contributions_goal_date',
           'idx_savings_contributions_account_date',
+          'idx_shopping_items_list',
+          'idx_shopping_lists_date',
         ]),
       );
     });
@@ -606,7 +610,7 @@ void main() {
 
         final AppDatabase upgraded = AppDatabase.atFile(file);
         await upgraded.customSelect('SELECT 1').get();
-        expect(upgraded.schemaVersion, 3);
+        expect(upgraded.schemaVersion, appDatabaseSchemaVersion);
         expect(
           () => upgraded
               .into(upgraded.transactions)
@@ -620,6 +624,11 @@ void main() {
                 ),
               ),
           throwsA(isA<SqliteException>()),
+        );
+        // The shopping tables exist after the v1 -> v4 upgrade too.
+        expect(
+          await upgraded.select(upgraded.shoppingLists).get(),
+          isEmpty,
         );
         await upgraded.close();
       },

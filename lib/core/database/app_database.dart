@@ -14,6 +14,8 @@ import 'tables/budgets_table.dart';
 import 'tables/categories_table.dart';
 import 'tables/savings_contributions_table.dart';
 import 'tables/savings_goals_table.dart';
+import 'tables/shopping_items_table.dart';
+import 'tables/shopping_lists_table.dart';
 import 'tables/transactions_table.dart';
 
 part 'app_database.g.dart';
@@ -23,7 +25,8 @@ part 'app_database.g.dart';
 /// * 1 — initial schema (seven tables, indexes, constraints).
 /// * 2 — triggers enforcing that a transaction's category kind matches its type.
 /// * 3 — index for incoming-transfer lookups during account-balance calculation.
-const int appDatabaseSchemaVersion = 3;
+/// * 4 — shopping lists and their items (catatan belanja).
+const int appDatabaseSchemaVersion = 4;
 
 /// Triggers that keep cross-table invariants SQLite `CHECK` constraints cannot
 /// express. They are created for new databases and added by the upgrade path,
@@ -69,6 +72,8 @@ abstract final class SettingKeys {
     SavingsGoals,
     SavingsContributions,
     AppSettings,
+    ShoppingLists,
+    ShoppingItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -110,6 +115,10 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_transactions_to_account_date '
           'ON transactions (to_account_id, transaction_date)',
         );
+      }
+      if (from < 4) {
+        await m.createTable(shoppingLists);
+        await m.createTable(shoppingItems);
       }
     },
     beforeOpen: (OpeningDetails details) async {
