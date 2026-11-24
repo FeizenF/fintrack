@@ -53,6 +53,13 @@ class SettingsPage extends StatelessWidget {
                         subtitle: 'Dana darurat, laptop baru, modal usaha',
                         onTap: () => context.push(AppRoutes.savings),
                       ),
+                      const Divider(height: 1, indent: AppSpacing.lg + 32),
+                      _SettingsTile(
+                        icon: Icons.shopping_basket_outlined,
+                        title: 'Catatan Belanja',
+                        subtitle: 'Daftar belanjaan yang bisa langsung dicatat',
+                        onTap: () => context.push(AppRoutes.shopping),
+                      ),
                     ],
                   ),
                 ),
