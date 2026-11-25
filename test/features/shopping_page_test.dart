@@ -16,8 +16,6 @@ import 'package:fintrack/shared/providers/database_providers.dart';
 void main() {
   late AppDatabase database;
   late ShoppingRepository shopping;
-  late int accountId;
-  late int categoryId;
   late List<Account> accountRows;
   late List<Category> categoryRows;
 
@@ -26,15 +24,15 @@ void main() {
     await database.customSelect('SELECT 1').get();
     await database.ensureSeeded();
     shopping = ShoppingRepository(database);
-    accountId = await AccountsRepository(database)
-        .create(name: 'Dompet', type: AccountType.cash, initialBalance: 500000);
+    await AccountsRepository(database).create(
+      name: 'Dompet',
+      type: AccountType.cash,
+      initialBalance: 500000,
+    );
     accountRows = await AccountsRepository(database).list(includeArchived: true);
     categoryRows = await CategoriesRepository(
       database,
     ).list(includeArchived: true);
-    categoryId = categoryRows
-        .firstWhere((Category row) => row.kind == CategoryKind.expense)
-        .id;
   });
 
   tearDown(() async => database.close());
@@ -108,6 +106,34 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('cancel closes the new-note dialog without saving', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host(overridesFor(), const ShoppingPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Buat catatan'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nama catatan'),
+      'Dibatalkan',
+    );
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Catatan belanja baru'), findsNothing);
+    expect(find.text('Belum ada catatan belanja'), findsOneWidget);
+
+    late List<ShoppingListDetail> notes;
+    await tester.runAsync(() async {
+      notes = await shopping.list();
+    });
+    expect(notes, isEmpty);
+
+    await unmount(tester);
+  });
+
   testWidgets('detail page shows items, total and books one expense', (
     WidgetTester tester,
   ) async {
@@ -134,9 +160,7 @@ void main() {
     expect(find.text('2 × Rp 15.000'), findsOneWidget);
     expect(find.text('Rp 30.000'), findsWidgets);
 
-    await tester.tap(
-      find.textContaining('sebagai pengeluaran'),
-    );
+    await tester.tap(find.text('Catat pengeluaran'));
     await tester.pumpAndSettle();
 
     expect(find.text('Catat sebagai pengeluaran'), findsOneWidget);

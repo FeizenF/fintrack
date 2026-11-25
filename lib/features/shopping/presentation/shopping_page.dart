@@ -33,21 +33,11 @@ class ShoppingPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Catatan Belanja'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Catatan belanja baru',
-            onPressed: () => _openForm(context, ref),
-            icon: const Icon(Icons.add_rounded),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
+      appBar: AppBar(title: const Text('Catatan Belanja')),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Catatan belanja baru',
         onPressed: () => _openForm(context, ref),
-        icon: const Icon(Icons.playlist_add_rounded),
-        label: const Text('Catatan baru'),
+        child: const Icon(Icons.add_rounded),
       ),
       body: value.when(
         loading: () => const LoadingState(message: 'Memuat catatan belanja...'),
@@ -119,7 +109,7 @@ class ShoppingPage extends ConsumerWidget {
       context: context,
       builder: (BuildContext dialogContext) => _NoteFormDialog(note: note),
     );
-    if (savedId == null) return;
+    if (savedId == null || !context.mounted) return;
     ref.invalidate(shoppingListsProvider);
     if (note == null) {
       // Jump straight into the new note so items can be added right away.
@@ -138,39 +128,72 @@ class _NoteCard extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final Brightness brightness = theme.brightness;
     final bool hasTotal = note.total > 0;
+    final bool done = note.isBooked;
+    final Color accent = done
+        ? AppColors.incomeOf(brightness)
+        : theme.colorScheme.primary;
+    final int unpriced = note.itemCount - note.pricedCount;
 
     return AppCard(
       onTap: () => context.push(AppRoutes.shoppingDetail(note.list.id)),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Expanded(child: SectionTitle(note.list.title)),
-              if (note.isBooked)
-                _StatusChip(
-                  icon: Icons.check_circle_rounded,
-                  label: 'Tercatat',
-                  color: AppColors.incomeOf(brightness),
-                )
-              else if (note.isComplete)
-                _StatusChip(
-                  icon: Icons.shopping_cart_checkout_rounded,
-                  label: 'Siap dicatat',
-                  color: theme.colorScheme.primary,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.smallAll,
                 ),
+                child: Icon(
+                  done
+                      ? Icons.check_rounded
+                      : Icons.shopping_basket_outlined,
+                  size: 19,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    SectionTitle(note.list.title),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${Formatters.fullDate(note.list.shoppingDate)} · '
+                      '${note.itemCount} item',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _StatusChip(
+                icon: done
+                    ? Icons.check_circle_rounded
+                    : note.isComplete
+                    ? Icons.shopping_cart_checkout_rounded
+                    : Icons.pending_outlined,
+                label: done
+                    ? 'Tercatat'
+                    : note.isComplete
+                    ? 'Siap dicatat'
+                    : '${note.checkedCount}/${note.itemCount}',
+                color: done || note.isComplete
+                    ? accent
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '${Formatters.fullDate(note.list.shoppingDate)} · '
-            '${note.itemCount} item'
-            '${note.itemCount == note.checkedCount ? '' : ' · ${note.checkedCount} dicentang'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: <Widget>[
@@ -186,12 +209,18 @@ class _NoteCard extends StatelessWidget {
                         ),
                 ),
               ),
-              if (note.pricedCount < note.itemCount)
+              if (unpriced > 0)
                 Text(
-                  '${note.itemCount - note.pricedCount} item tanpa harga',
+                  '$unpriced tanpa harga',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.warningOf(brightness),
                   ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
             ],
           ),
@@ -328,7 +357,9 @@ class _NoteFormDialogState extends ConsumerState<_NoteFormDialog> {
       ),
       actions: <Widget>[
         DialogActions(
-          onCancel: _saving ? null : () => Navigator.pop(context, false),
+          // `showDialog<int>` returns the saved id, so cancel must pop nothing
+          // rather than `false` — that mismatch is what made Batal dead.
+          onCancel: _saving ? null : () => Navigator.pop(context),
           onConfirm: _saving ? null : _save,
           confirmLabel: _saving ? 'Menyimpan...' : 'Simpan',
         ),
