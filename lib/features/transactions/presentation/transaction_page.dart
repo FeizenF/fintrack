@@ -92,10 +92,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                       ),
                 border: const OutlineInputBorder(),
                 isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs),
           _ChipRow(
             children: <Widget>[
               _FilterChip(
@@ -435,6 +439,9 @@ class _FilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
+      // Compact density keeps the three chip rows from eating the list area.
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     ),
   );
 }
