@@ -12,6 +12,7 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
+import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/section_title.dart';
 import '../../../shared/providers/database_providers.dart';
 
@@ -70,19 +71,19 @@ class ShoppingDetailPage extends ConsumerWidget {
           }
           return Column(
             children: <Widget>[
-              Expanded(child: _Body(note: note)),
+              Expanded(
+                child: _Body(
+                  note: note,
+                  onAddItem: note.isBooked
+                      ? null
+                      : () => _addItem(context, ref),
+                ),
+              ),
               _BookingBar(note: note),
             ],
           );
         },
       ),
-      floatingActionButton: value.value == null || value.value!.isBooked
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _addItem(context, ref),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Tambah item'),
-            ),
     );
   }
 
@@ -228,9 +229,12 @@ class ShoppingDetailPage extends ConsumerWidget {
 }
 
 class _Body extends ConsumerWidget {
-  const _Body({required this.note});
+  const _Body({required this.note, this.onAddItem});
 
   final ShoppingListDetail note;
+
+  /// Null once the note is booked: a booked note is read-only.
+  final VoidCallback? onAddItem;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -241,7 +245,7 @@ class _Body extends ConsumerWidget {
         AppSpacing.lg,
         AppSpacing.md,
         AppSpacing.lg,
-        120,
+        AppSpacing.xl,
       ),
       children: <Widget>[
         AppCard(
@@ -250,22 +254,47 @@ class _Body extends ConsumerWidget {
             children: <Widget>[
               SectionTitle(note.list.title),
               const SizedBox(height: AppSpacing.xs),
-              Text(
-                Formatters.fullDate(note.list.shoppingDate),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.event_outlined,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      Formatters.fullDate(note.list.shoppingDate),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  if (note.isBooked)
+                    Text(
+                      'Tercatat',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppColors.incomeOf(theme.brightness),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
               ),
               if (note.list.note case final String extra) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
-                Text(extra),
+                Text(
+                  extra,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: <Widget>[
                   Expanded(
                     child: _Metric(
-                      label: 'Item',
+                      label: 'Dicentang',
                       value: '${note.checkedCount}/${note.itemCount}',
                     ),
                   ),
@@ -309,26 +338,51 @@ class _Body extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: <Widget>[
-            const Expanded(child: SectionTitle('Daftar item')),
-            if (note.items.isNotEmpty && !note.isBooked)
-              TextButton(
-                onPressed: () => _toggleAll(ref, !note.isComplete),
-                child: Text(note.isComplete ? 'Batal centang' : 'Centang semua'),
-              ),
-          ],
+        SectionHeader(
+          title: 'Daftar item',
+          subtitle: note.items.isEmpty
+              ? null
+              : '${note.itemCount} item · '
+                    '${note.itemCount - note.pricedCount} tanpa harga',
+          action: onAddItem == null
+              ? null
+              : TextButton.icon(
+                  onPressed: onAddItem,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Tambah'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                    ),
+                  ),
+                ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        if (note.items.isNotEmpty && !note.isBooked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => _toggleAll(ref, !note.isComplete),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  note.isComplete ? 'Batal centang semua' : 'Centang semua',
+                ),
+              ),
+            ),
+          ),
         if (note.items.isEmpty)
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  'Belum ada item.',
-                  style: theme.textTheme.titleSmall,
-                ),
+                Text('Belum ada item.', style: theme.textTheme.titleSmall),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Tambahkan barang belanjaan beserta jumlah dan harganya.',
@@ -336,6 +390,14 @@ class _Body extends ConsumerWidget {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
+                if (onAddItem != null) ...<Widget>[
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: onAddItem,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Tambah item pertama'),
+                  ),
+                ],
               ],
             ),
           )
@@ -412,65 +474,96 @@ class _ItemTile extends ConsumerWidget {
         : '${item.quantity} × ${Formatters.currency(unitPrice)}';
 
     return AppCard(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xs,
+        AppSpacing.xs,
+        AppSpacing.xs,
+        0,
       ),
       child: Row(
         children: <Widget>[
           Checkbox(
             value: item.isChecked,
+            visualDensity: VisualDensity.compact,
             onChanged: locked
                 ? null
                 : (bool? value) => _toggle(ref, value ?? false),
           ),
-          const SizedBox(width: AppSpacing.xs),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.name,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    decoration: item.isChecked
-                        ? TextDecoration.lineThrough
-                        : null,
-                    color: item.isChecked
-                        ? theme.colorScheme.onSurfaceVariant
-                        : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    item.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      decoration: item.isChecked
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: item.isChecked
+                          ? theme.colorScheme.onSurfaceVariant
+                          : null,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (unitPrice != null)
-            Text(
-              Formatters.currency(item.quantity * unitPrice),
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+                ],
               ),
             ),
-          if (!locked)
-            PopupMenuButton<String>(
-              tooltip: 'Aksi item ${item.name}',
-              onSelected: (String action) {
-                if (action == 'edit') {
-                  _edit(context, ref);
-                } else {
-                  _remove(context, ref);
-                }
-              },
-              itemBuilder: (_) => const <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(value: 'edit', child: Text('Ubah')),
-                PopupMenuItem<String>(value: 'delete', child: Text('Hapus')),
-              ],
-            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (unitPrice != null)
+                Text(
+                  Formatters.currency(item.quantity * unitPrice),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              SizedBox(
+                height: 28,
+                child: !locked
+                    ? PopupMenuButton<String>(
+                        tooltip: 'Aksi item ${item.name}',
+                        padding: EdgeInsets.zero,
+                        iconSize: 18,
+                        splashRadius: 16,
+                        onSelected: (String action) {
+                          if (action == 'edit') {
+                            _edit(context, ref);
+                          } else {
+                            _remove(context, ref);
+                          }
+                        },
+                        itemBuilder: (_) => const <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Text('Ubah'),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('Hapus'),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -787,58 +880,64 @@ class _BookingBarState extends ConsumerState<_BookingBar> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
-            AppSpacing.md,
+            AppSpacing.sm,
             AppSpacing.lg,
-            AppSpacing.md,
+            AppSpacing.sm,
           ),
           decoration: BoxDecoration(
             border: Border(
               top: BorderSide(color: AppColors.borderOf(theme.brightness)),
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Text(
-                    'Total belanja',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      'Total belanja',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    Formatters.currency(total),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    Text(
+                      Formatters.currency(total),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.md),
               if (widget.note.isBooked)
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                   ),
                   onPressed: _busy ? null : () => _unbook(context),
-                  icon: const Icon(Icons.undo_rounded),
-                  label: const Text('Batalkan pencatatan'),
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                  label: const Text('Batalkan'),
                 )
               else
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
                   ),
                   onPressed: _busy || total <= 0 ? null : () => _book(context),
-                  icon: const Icon(Icons.playlist_add_check_rounded),
-                  label: Text(
-                    _busy
-                        ? 'Menyimpan...'
-                        : 'Catat ${Formatters.currency(total)} sebagai pengeluaran',
+                  icon: const Icon(
+                    Icons.playlist_add_check_rounded,
+                    size: 18,
                   ),
+                  label: Text(_busy ? 'Menyimpan...' : 'Catat pengeluaran'),
                 ),
             ],
           ),
