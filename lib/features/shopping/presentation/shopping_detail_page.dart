@@ -937,7 +937,11 @@ class _BookingBarState extends ConsumerState<_BookingBar> {
                     Icons.playlist_add_check_rounded,
                     size: 18,
                   ),
-                  label: Text(_busy ? 'Menyimpan...' : 'Catat pengeluaran'),
+                  label: Text(
+                    _busy ? 'Menyimpan...' : 'Catat pengeluaran',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
             ],
           ),

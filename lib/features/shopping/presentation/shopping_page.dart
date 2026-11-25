@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/database/enums.dart';
 import '../../../core/database/repositories/shopping_repository.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
