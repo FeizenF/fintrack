@@ -13,6 +13,7 @@ import '../../../core/widgets/dialog_actions.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../../core/widgets/loading_state.dart';
+import '../../../core/widgets/tab_page_header.dart';
 import '../../../shared/providers/database_providers.dart';
 
 /// Monthly spending limits per expense category.
@@ -43,25 +44,23 @@ class _BudgetsPageState extends ConsumerState<BudgetsPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Anggaran'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: 'Tambah anggaran',
-            onPressed: () => _openForm(),
-            icon: const Icon(Icons.add_rounded),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-      ),
       body: Column(
         children: <Widget>[
+          TabPageHeader(
+            title: 'Anggaran',
+            subtitle: 'Batas pengeluaran per kategori',
+            trailing: IconButton(
+              tooltip: 'Tambah anggaran',
+              onPressed: () => _openForm(),
+              icon: const Icon(Icons.add_rounded),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
+              AppSpacing.lg,
               0,
+              AppSpacing.lg,
+              AppSpacing.xs,
             ),
             child: Row(
               children: <Widget>[

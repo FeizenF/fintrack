@@ -25,11 +25,13 @@ class TabPageHeader extends StatelessWidget {
     final double titleHeight =
         (titleStyle?.fontSize ?? 24) * (titleStyle?.height ?? 1.25);
     return Padding(
+      // Compact top padding: every tab page (Beranda, Transaksi, Anggaran,
+      // Laporan, Setelan) starts its title on the same line, close to the top.
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.lg,
         AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.sm,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
